@@ -1870,7 +1870,7 @@ displayAdminBooks();
    DELETE SUBCATEGORY
 ===================================================== */
 
-function deleteSubcategory(
+async function deleteSubcategory(
     category,
     subcategory
 ) {
@@ -1904,64 +1904,119 @@ function deleteSubcategory(
         });
 
 
-   localStorage.setItem(
-    "subcategories",
-    JSON.stringify(allSubcategories)
-);
+ /* =========================================
+   DELETE SUBCATEGORY FROM FIRESTORE
+========================================= */
+
+try {
+
+    await db.collection("settings")
+        .doc("subcategories")
+        .set({
+            items: allSubcategories
+        });
+
+    localStorage.setItem(
+        "subcategories",
+        JSON.stringify(allSubcategories)
+    );
+
+    console.log(
+        "Subcategory deleted from Firestore:",
+        subcategory
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error deleting subcategory:",
+        error
+    );
+
+    alert(
+        "Subcategory could not be deleted."
+    );
+
+    return;
+}
 
 
 /* =====================================================
    REMOVE DELETED SUBCATEGORY FROM BOOKS
 ===================================================== */
 
-let books = getBooks();
+/* =========================================
+   REMOVE SUBCATEGORY FROM FIRESTORE BOOKS
+========================================= */
 
+try {
 
-books.forEach(function (book) {
+    const snapshot =
+        await db.collection("books")
+            .where(
+                "category",
+                "==",
+                category
+            )
+            .get();
 
-    /* Only check books in this category */
+    const batch =
+        db.batch();
 
-    if (book.category !== category) {
-        return;
-    }
+    snapshot.forEach(function (doc) {
 
+        const book =
+            doc.data();
 
-    /* SUPPORT OLD + NEW BOOK STRUCTURE */
+        const bookSubcategories =
+            Array.isArray(book.subcategories)
+                ? book.subcategories
+                : book.subcategory
+                    ? [book.subcategory]
+                    : [];
 
-    const bookSubcategories =
-        Array.isArray(book.subcategories)
-            ? book.subcategories
-            : book.subcategory
-                ? [book.subcategory]
-                : [];
+        const updatedSubcategories =
+            bookSubcategories.filter(
+                function (item) {
+                    return item !== subcategory;
+                }
+            );
 
+        batch.update(
+            doc.ref,
+            {
+                subcategories:
+                    updatedSubcategories,
 
-    /* REMOVE DELETED SUBCATEGORY */
-
-    book.subcategories =
-        bookSubcategories.filter(
-            function (item) {
-
-                return item !== subcategory;
-
+                subcategory:
+                    firebase.firestore.FieldValue.delete()
             }
         );
 
+    });
 
-    /* REMOVE OLD SINGLE SUBCATEGORY PROPERTY */
+    await batch.commit();
 
-    delete book.subcategory;
+    console.log(
+        "Subcategory removed from affected books:",
+        subcategory
+    );
 
-});
+}
+catch (error) {
 
+    console.error(
+        "Error updating affected books:",
+        error
+    );
 
-/* SAVE UPDATED BOOKS */
+    alert(
+        "Subcategory was deleted, but some books could not be updated."
+    );
 
-localStorage.setItem(
-    "books",
-    JSON.stringify(books)
-);
-
+    return;
+}
 
 /* REFRESH WEBSITE */
 
