@@ -6600,14 +6600,14 @@ catch (error) {
 
                         <button
                             class="edit-btn"
-                            onclick="editBook(${book.id})"
+                            onclick="editBook('${book.id}')"
                         >
                             Edit
                         </button>
 
                         <button
                             class="delete-btn"
-                            onclick="deleteBook(${book.id})"
+                            onclick="deleteBook('${book.id}')"
                         >
                             Delete
                         </button>
