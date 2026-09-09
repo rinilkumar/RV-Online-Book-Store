@@ -9827,11 +9827,13 @@ function rejectOrderPayment(orderId) {
 
 document.addEventListener(
     "DOMContentLoaded",
-    function () {
+    async function () {
 
         initializeStorage();
 
         initializeManagerPermissions();
+
+       await loadCategoriesFromFirestore();
 
         loadCategoryFilter();
 
@@ -9862,3 +9864,48 @@ db.collection("test").add({
 .catch((error) => {
     console.error("Firebase connection error:", error);
 });
+
+/* =====================================================
+   LOAD CATEGORIES FROM FIRESTORE
+===================================================== */
+
+async function loadCategoriesFromFirestore() {
+
+    try {
+
+        const doc =
+            await db.collection("settings")
+                .doc("categories")
+                .get();
+
+        if (doc.exists) {
+
+            const data = doc.data();
+
+            const categories =
+                Array.isArray(data.items)
+                    ? data.items
+                    : [];
+
+            localStorage.setItem(
+                "categories",
+                JSON.stringify(categories)
+            );
+
+            console.log(
+                "Categories loaded from Firestore:",
+                categories
+            );
+
+        }
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error loading categories:",
+            error
+        );
+
+    }
+}
