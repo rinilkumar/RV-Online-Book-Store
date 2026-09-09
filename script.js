@@ -9945,6 +9945,48 @@ function rejectOrderPayment(orderId) {
 }
 
 /* =====================================================
+   LOAD SUBCATEGORIES FROM FIRESTORE
+===================================================== */
+
+async function loadSubcategoriesFromFirestore() {
+
+    try {
+
+        const doc =
+            await db.collection("settings")
+                .doc("subcategories")
+                .get();
+
+        if (doc.exists) {
+
+            const data = doc.data();
+
+            const subcategories =
+                data.items || {};
+
+            localStorage.setItem(
+                "subcategories",
+                JSON.stringify(subcategories)
+            );
+
+            console.log(
+                "Subcategories loaded from Firestore:",
+                subcategories
+            );
+
+        }
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error loading subcategories:",
+            error
+        );
+
+    }
+}
+/* =====================================================
    START WEBSITE
 ===================================================== */
 
@@ -9957,6 +9999,8 @@ document.addEventListener(
         initializeManagerPermissions();
 
        await loadCategoriesFromFirestore();
+
+       await loadSubcategoriesFromFirestore();
 
         loadCategoryFilter();
 
