@@ -17,10 +17,6 @@ firebase.initializeApp(firebaseConfig);
 
 /* Connect to Firestore */
 const db = firebase.firestore();
-db.settings({
-    experimentalForceLongPolling: true
-   merge: true
-});
 
 console.log("Firebase connected successfully");
 console.log(db);
