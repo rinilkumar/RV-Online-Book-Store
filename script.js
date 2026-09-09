@@ -2231,7 +2231,7 @@ alert(
    EDIT CATEGORY
 ===================================================== */
 
-function editCategory(index) {
+async function editCategory(index) {
 
     let categories =
         getCategories();
@@ -2294,38 +2294,98 @@ function editCategory(index) {
         newCategory;
 
 
+    try {
+
+    await db.collection("settings")
+        .doc("categories")
+        .set({
+            items: categories
+        });
+
     localStorage.setItem(
         "categories",
         JSON.stringify(categories)
     );
 
+    console.log(
+        "Category updated in Firestore:",
+        oldCategory,
+        "->",
+        newCategory
+    );
 
-    /* Update books using old category */
+}
+catch (error) {
 
-    let books =
-        getBooks();
+    console.error(
+        "Error updating category:",
+        error
+    );
+
+    alert(
+        "Category could not be updated."
+    );
+
+    return;
+}
 
 
-    books.forEach(
-        function (book) {
+   /* =========================================
+   UPDATE CATEGORY INSIDE FIRESTORE BOOKS
+========================================= */
 
-            if (
-                book.category ===
+try {
+
+    const snapshot =
+        await db.collection("books")
+            .where(
+                "category",
+                "==",
                 oldCategory
-            ) {
+            )
+            .get();
 
-                book.category =
-                    newCategory;
+
+    const batch =
+        db.batch();
+
+
+    snapshot.forEach(function (doc) {
+
+        batch.update(
+            doc.ref,
+            {
+                category: newCategory
             }
-        }
+        );
+
+    });
+
+
+    await batch.commit();
+
+
+    console.log(
+        "Book categories updated:",
+        oldCategory,
+        "->",
+        newCategory
     );
 
+}
+catch (error) {
 
-    localStorage.setItem(
-        "books",
-        JSON.stringify(books)
+    console.error(
+        "Error updating book categories:",
+        error
     );
 
+    alert(
+        "Category was renamed, but some books could not be updated."
+    );
+
+    return;
+}
 
     refreshCategories();
 
