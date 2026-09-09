@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>RV Book Store - Online Book Store</title>
+
+    <!-- CSS FILE -->
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+     HEADER / NAVIGATION
+===================================================== -->
+
+<header>
+
+    <div class="logo">
+        📚 RV Book Store
+    </div>
+
+
+    <nav>
+
+        <button onclick="showPage('home')">
+            Home
+        </button>
+
+
+        <button onclick="showPage('home'); scrollToBooks()">
+            Books
+        </button>
+
+
+        <button onclick="showPage('cart')">
+            🛒 Cart
+            (<span id="cartCount">0</span>)
+        </button>
+
+
+        <button
+            id="historyNav"
+            onclick="showPage('history')">
+            📜 Purchase History
+        </button>
+
+
+        <!-- SINGLE ACCOUNT BUTTON -->
+
+        <button
+            id="accountNav"
+            onclick="showPage('accountPage')">
+            Login / Register
+        </button>
+
+    </nav>
+
+</header>
+
+
+
+<!-- =====================================================
+     HOME PAGE
+===================================================== -->
+
+<div id="home" class="page active">
+
+
+    <!-- HERO SECTION -->
+
+    <section class="hero">
+
+        <h1>
+            Discover Your Next Favorite Book
+        </h1>
+
+
+        <p>
+            Explore books from different categories
+            and start your reading journey with RV Book Store.
+        </p>
+
+
+        <button class="btn"
+                onclick="scrollToBooks()">
+
+            Shop Books
+
+        </button>
+
+    </section>
+
+
+
+    <!-- BOOK SECTION -->
+
+    <section class="section"
+             id="booksSection">
+
+
+        <h2 class="section-title">
+            📚 Our Books
+        </h2>
+
+
+        <!-- SEARCH AND FILTER -->
+
+        <div class="filters">
+
+
+            <input
+                type="text"
+                id="search"
+                placeholder="Search books..."
+                oninput="displayBooks()"
+            >
+
+
+          <!-- MAIN CATEGORY -->
+
+<select
+    id="category"
+    onchange="loadSubcategoryFilter(); displayBooks()">
+
+    <option value="all">
+        All Categories
+    </option>
+
+</select>
+
+
+<!-- SUBCATEGORY -->
+
+<select
+    id="subcategory"
+    onchange="displayBooks()">
+
+    <option value="all">
+        All Subcategories
+    </option>
+
+</select>
+
+        </div>
+
+
+        <!-- BOOK CARDS -->
+
+        <div
+            id="bookContainer"
+            class="book-container">
+
+            <!-- JavaScript loads books here -->
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ABOUT SECTION -->
+
+    <section class="about">
+
+        <h2>
+            About RV Book Store
+        </h2>
+
+
+        <p>
+
+            RV Book Store is an online bookstore where
+            customers can discover books, search for
+            their favorite titles, add books to their
+            shopping cart and place orders easily.
+
+        </p>
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+     SHOPPING CART PAGE
+===================================================== -->
+
+<div id="cart" class="page">
+
+
+    <section class="section">
+
+
+        <h1 class="section-title">
+            🛒 Shopping Cart
+        </h1>
+
+
+        <button
+            type="button"
+            class="back-to-store-btn"
+            onclick="showPage('home')">
+
+            ← Back to Store
+
+        </button>
+
+
+        <!-- CART ITEMS -->
+
+        <div
+            id="cartItems"
+            class="cart-container">
+
+            <!-- JavaScript loads cart items -->
+
+        </div>
+
+
+        <!-- CART SUMMARY -->
+
+        <div class="cart-summary">
+
+
+            <h2>
+
+                Total:
+                ₹<span id="cartTotal">0</span>
+
+            </h2>
+
+
+            <button
+                class="btn"
+                onclick="goToPayment()">
+
+                Click to Pay
+
+            </button>
+
+        </div>
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+     DELIVERY ADDRESS PAGE
+===================================================== -->
+
+<div id="deliveryAddress" class="page">
+
+
+    <section class="section">
+
+
+        <h1 class="section-title">
+            📍 Delivery Address
+        </h1>
+
+
+        <div class="auth-container">
+
+
+            <div class="auth-box delivery-address-box">
+
+
+                <h2>
+                    Enter Delivery Details
+                </h2>
+
+
+                <p class="address-subtitle">
+
+                    Enter the address where you want
+                    your books to be delivered.
+
+                </p>
+
+
+                <form onsubmit="saveDeliveryAddress(event)">
+
+
+                    <!-- FULL NAME -->
+
+                    <input
+                        type="text"
+                        id="deliveryName"
+                        placeholder="Full Name"
+                        required
+                    >
+
+
+                    <!-- PHONE -->
+
+                    <input
+                        type="tel"
+                        id="deliveryPhone"
+                        placeholder="Phone Number"
+                        required
+                    >
+
+
+                    <!-- HOUSE / STREET -->
+
+                    <textarea
+                        id="deliveryAddressText"
+                        placeholder="House No / Street / Area"
+                        rows="3"
+                        required
+                    ></textarea>
+
+
+                    <!-- CITY -->
+
+                    <input
+                        type="text"
+                        id="deliveryCity"
+                        placeholder="City"
+                        required
+                    >
+
+
+                    <!-- STATE -->
+
+                    <input
+                        type="text"
+                        id="deliveryState"
+                        placeholder="State"
+                        required
+                    >
+
+
+                    <!-- PINCODE -->
+
+                    <input
+                        type="text"
+                        id="deliveryPincode"
+                        placeholder="PIN Code"
+                        maxlength="6"
+                        required
+                    >
+
+
+                    <button
+                        type="submit"
+                        class="btn">
+
+                        Continue to Payment →
+
+                    </button>
+
+                </form>
+
+
+                <br>
+
+
+                <button
+                    type="button"
+                    class="btn"
+                    onclick="showPage('cart')">
+
+                    ← Back to Cart
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+     PAYMENT / CHECKOUT PAGE
+===================================================== -->
+
+<div id="payment" class="page">
+
+
+    <section class="section">
+
+
+        <h1 class="section-title">
+            💳 Checkout & Payment
+        </h1>
+
+
+        <div class="auth-container">
+
+
+            <div class="auth-box">
+
+
+                <h2>
+                    Select Payment Method
+                </h2>
+
+
+                <!-- ORDER TOTAL -->
+
+                <div class="payment-total">
+
+
+                    <p>
+                        Order Total
+                    </p>
+
+
+                    <h2>
+                        ₹<span id="paymentTotal">0</span>
+                    </h2>
+
+                </div>
+
+
+
+<!-- =====================================================
+     PAYMENT OPTIONS
+===================================================== -->
+
+<div class="payment-options">
+
+
+    <!-- ONLINE UPI PAYMENT -->
+
+    <label class="payment-option">
+
+        <input
+            type="radio"
+            name="paymentMethod"
+            value="UPI"
+            onchange="changePaymentMethod()"
+            checked
+        >
+
+        <span>
+            📱 Online Payment - UPI / QR Code
+        </span>
+
+    </label>
+
+
+    <!-- CASH ON DELIVERY -->
+
+    <label class="payment-option">
+
+        <input
+            type="radio"
+            name="paymentMethod"
+            value="Cash on Delivery"
+            onchange="changePaymentMethod()"
+        >
+
+        <span>
+            🚚 Cash on Delivery
+        </span>
+
+    </label>
+
+
+</div>
+
+
+                <!-- PAYMENT CONFIRMATION -->
+
+                <button
+    type="button"
+    class="btn"
+    id="continuePaymentBtn"
+    onclick="continueSelectedPayment()"
+>
+
+    Proceed to Pay
+
+</button>
+
+<!-- =====================================================
+     ONLINE UPI PAYMENT DETAILS
+===================================================== -->
+
+<div
+    id="onlinePaymentDetails"
+    class="online-payment-details"
+    style="display: none;"
+>
+
+    <h2>
+        📱 Pay RV Book Store
+    </h2>
+
+    <p class="payment-instruction">
+        Scan the QR code or use the UPI ID below
+        to complete your payment.
+    </p>
+
+
+    <!-- AMOUNT -->
+
+    <div class="upi-amount-box">
+
+        <span>
+            Amount to Pay
+        </span>
+
+        <h2>
+            ₹<span id="upiPaymentAmount">0</span>
+        </h2>
+
+    </div>
+
+
+    <!-- QR CODE -->
+
+    <div class="payment-qr-box">
+
+        <p>
+            Scan QR Code to Pay
+        </p>
+
+        <img
+            id="adminPaymentQR"
+            src="upi.jpg"
+            alt="Store UPI QR Code"
+        >
+
+    </div>
+
+
+    <!-- STORE / ADMIN PAYMENT NAME -->
+
+    <div class="payment-detail-row">
+
+        <span>
+            Payment To
+        </span>
+
+        <strong id="paymentReceiverName">
+            RV Book Store
+        </strong>
+
+    </div>
+
+
+    <!-- UPI ID -->
+
+    <div class="payment-detail-row">
+
+        <span>
+            UPI ID
+        </span>
+
+        <strong id="adminUpiId">
+            9976494855@ybl
+        </strong>
+
+    </div>
+
+
+    <!-- COPY UPI BUTTON -->
+
+    <button
+        type="button"
+        class="copy-upi-btn"
+        onclick="copyAdminUpiId()"
+    >
+        📋 Copy UPI ID
+    </button>
+
+
+    <hr>
+
+
+    <!-- TRANSACTION ID -->
+
+    <div class="transaction-section">
+
+        <label for="paymentTransactionId">
+            UPI Transaction / Reference ID
+        </label>
+
+        <input
+            type="text"
+            id="paymentTransactionId"
+            placeholder="Enter transaction/reference ID after payment"
+            autocomplete="off"
+        >
+
+        <p class="transaction-help">
+            Complete the payment first, then enter
+            the transaction/reference ID shown by
+            your payment app.
+        </p>
+
+    </div>
+
+
+    <!-- CONFIRM PAYMENT -->
+
+    <button
+        type="button"
+        class="btn"
+        onclick="confirmOnlinePayment()"
+    >
+        ✓ Confirm Payment & Place Order
+    </button>
+
+</div>
+
+                <br><br>
+
+
+                <button
+                    class="btn"
+                    onclick="showPage('cart')">
+
+                    ← Back to Cart
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+     PURCHASE RECEIPT PAGE
+===================================================== -->
+
+<div id="receipt" class="page">
+
+
+    <section class="section">
+
+
+        <h1 class="section-title">
+            🧾 Purchase Receipt
+        </h1>
+
+
+        <div class="receipt-container">
+
+
+            <div
+                id="receiptContent"
+                class="receipt">
+
+                <!-- Receipt generated by JavaScript -->
+
+            </div>
+
+
+            <div class="receipt-buttons">
+
+
+                <button
+                    class="btn"
+                    onclick="downloadReceipt()">
+
+                    ⬇️ Download Receipt
+
+                </button>
+
+
+                <button
+                    class="btn"
+                    onclick="showPage('home')">
+
+                    Continue Shopping
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+     SINGLE ACCOUNT PAGE
+===================================================== -->
+
+<div id="accountPage" class="page">
+
+
+    <div class="combined-auth-container">
+
+
+        <div class="combined-auth-box">
+
+
+            <h1>
+                📚 RV Book Store
+            </h1>
+
+
+            <p class="account-subtitle">
+                Customer and Admin Access
+            </p>
+
+
+            <!-- TABS -->
+
+           <!-- =====================================================
+     LOGIN / REGISTER MENU
+===================================================== -->
+
+<div class="account-menu">
+
+    <select
+        id="accountMenuSelect"
+        onchange="changeAccountForm()"
+    >
+
+        <option value="customerLoginForm">
+            Customer Login
+        </option>
+
+        <option value="registerForm">
+            Customer Register
+        </option>
+
+        <option value="adminLoginForm">
+            Admin Login
+        </option>
+
+        <option value="managerLoginForm">
+            Manager Login
+        </option>
+
+        <option value="managerRegisterForm">
+            Manager Register
+        </option>
+
+    </select>
+
+</div>
+
+
+
+            <!-- =================================================
+                 CUSTOMER LOGIN
+            ================================================== -->
+
+            <div
+                id="customerLoginForm"
+                class="account-form-section active">
+
+
+                <h2>
+                    👤 Customer Login
+                </h2>
+
+
+                <form onsubmit="customerLogin(event)">
+
+
+                    <input
+                        type="email"
+                        id="loginEmail"
+                        placeholder="Email Address"
+                        required
+                    >
+
+
+                    <div class="password-field">
+
+
+                        <input
+                            type="password"
+                            id="loginPassword"
+                            placeholder="Password"
+                            required
+                        >
+
+
+                        <button
+                            type="button"
+                            onclick="togglePassword(
+                                'loginPassword',
+                                this
+                            )">
+
+                            Show
+
+                        </button>
+
+                    </div>
+
+
+                    <button
+                        type="submit"
+                        class="btn">
+
+                        Customer Login
+
+                    </button>
+
+                </form>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 CUSTOMER REGISTER
+            ================================================== -->
+
+            <div
+                id="registerForm"
+                class="account-form-section">
+
+
+                <h2>
+                    📝 Create Customer Account
+                </h2>
+
+
+                <form onsubmit="registerCustomer(event)">
+
+
+                    <input
+                        type="text"
+                        id="regName"
+                        placeholder="Full Name"
+                        required
+                    >
+
+
+                    <input
+                        type="email"
+                        id="regEmail"
+                        placeholder="Email Address"
+                        required
+                    >
+
+
+                    <input
+                        type="tel"
+                        id="regPhone"
+                        placeholder="Phone Number"
+                        required
+                    >
+
+
+                    <div class="password-field">
+
+
+                        <input
+                            type="password"
+                            id="regPassword"
+                            placeholder="Password"
+                            minlength="6"
+                            required
+                        >
+
+
+                        <button
+                            type="button"
+                            onclick="togglePassword(
+                                'regPassword',
+                                this
+                            )">
+
+                            Show
+
+                        </button>
+
+                    </div>
+
+
+                    <button
+                        type="submit"
+                        class="btn">
+
+                        Register
+
+                    </button>
+
+                </form>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 ADMIN LOGIN
+            ================================================== -->
+
+            <div
+                id="adminLoginForm"
+                class="account-form-section">
+
+
+                <h2>
+                    🛠️ Shop Admin Login
+                </h2>
+
+
+                <form onsubmit="adminLogin(event)">
+
+
+                    <input
+                        type="text"
+                        id="adminUsername"
+                        placeholder="Admin Username"
+                        required
+                    >
+
+
+                    <div class="password-field">
+
+
+                        <input
+                            type="password"
+                            id="adminPassword"
+                            placeholder="Admin Password"
+                            required
+                        >
+
+
+                        <button
+                            type="button"
+                            onclick="togglePassword(
+                                'adminPassword',
+                                this
+                            )">
+
+                            Show
+
+                        </button>
+
+                    </div>
+
+
+                    <button
+                        type="submit"
+                        class="btn">
+
+                        Admin Login
+
+                    </button>
+
+                </form>
+
+            </div>
+
+            <!-- =====================================================
+     MANAGER LOGIN
+===================================================== -->
+
+<div
+    id="managerLoginForm"
+    class="account-form-section">
+
+    <h2>👨‍💼 Manager Login</h2>
+
+    <form onsubmit="managerLogin(event)">
+
+        <input
+            type="text"
+            id="managerLoginId"
+            placeholder="Manager ID (Example: MGR001)"
+            required
+        >
+
+        <input
+            type="email"
+            id="managerLoginEmail"
+            placeholder="Email Address"
+            required
+        >
+
+        <div class="password-field">
+
+            <input
+                type="password"
+                id="managerLoginPassword"
+                placeholder="Password"
+                required
+            >
+
+            <button
+                type="button"
+                onclick="togglePassword('managerLoginPassword', this)">
+
+                Show
+
+            </button>
+
+        </div>
+
+        <button type="submit" class="btn">
+            Manager Login
+        </button>
+
+    </form>
+
+</div>
+
+
+<!-- =====================================================
+     MANAGER REGISTRATION
+===================================================== -->
+
+<div
+    id="managerRegisterForm"
+    class="account-form-section">
+
+    <h2>📝 Manager Registration</h2>
+
+    <p class="manager-register-note">
+        New Manager accounts require Admin approval.
+    </p>
+
+    <form onsubmit="registerManager(event)">
+
+        <input
+            type="text"
+            id="managerRegName"
+            placeholder="Full Name"
+            required
+        >
+
+        <input
+            type="email"
+            id="managerRegEmail"
+            placeholder="Email Address"
+            required
+        >
+
+        <input
+            type="tel"
+            id="managerRegPhone"
+            placeholder="Phone Number"
+            required
+        >
+
+        <div class="password-field">
+
+            <input
+                type="password"
+                id="managerRegPassword"
+                placeholder="Password"
+                minlength="6"
+                required
+            >
+
+            <button
+                type="button"
+                onclick="togglePassword('managerRegPassword', this)">
+
+                Show
+
+            </button>
+
+        </div>
+
+        <button type="submit" class="btn">
+            Send Registration Request
+        </button>
+
+    </form>
+
+</div>
+
+
+            <!-- BACK TO STORE -->
+
+            <button
+                type="button"
+                class="back-store-account"
+                onclick="showPage('home')">
+
+                ← Back to Store
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+<!-- =====================================================
+     ADMIN DASHBOARD PAGE
+===================================================== -->
+
+<div id="admin" class="page">
+
+
+    <section class="admin-dashboard">
+
+
+        <h1>
+            🛠️ Shop Admin Dashboard
+        </h1>
+
+
+        <p>
+            Manage your online book store.
+        </p>
+
+
+        <!-- DASHBOARD STATISTICS -->
+
+        <div class="dashboard-cards">
+
+
+            <!-- TOTAL BOOKS -->
+
+            <div
+                class="dashboard-card book-card-link"
+                onclick="openBooksPage()">
+
+
+                <h3>
+                    📚 Total Books
+                </h3>
+
+
+                <p id="totalBooks">
+                    0
+                </p>
+
+
+                <span class="book-link">
+                    View Book Details →
+                </span>
+
+            </div>
+
+
+
+            <!-- TOTAL CUSTOMERS -->
+
+            <div
+                class="dashboard-card customer-card"
+                onclick="openCustomersPage()">
+
+
+                <h3>
+                    👥 Customers
+                </h3>
+
+
+                <p id="totalCustomers">
+                    0
+                </p>
+
+
+                <span class="customer-link">
+                    View Customer Details →
+                </span>
+
+            </div>
+
+
+
+            <!-- TOTAL ORDERS -->
+
+            <div
+                class="dashboard-card order-card-link"
+                onclick="openOrdersPage()">
+
+
+                <h3>
+                    📦 Orders
+                </h3>
+
+
+                <p id="totalOrders">
+                    0
+                </p>
+
+
+                <span class="order-link">
+                    View Order Details →
+                </span>
+
+            </div>
+
+            <!-- MANAGERS -->
+
+<div
+    class="dashboard-card manager-card-link"
+    onclick="openManagersPage()">
+
+    <h3>
+        👨‍💼 Managers
+    </h3>
+
+    <p id="totalManagers">
+        0
+    </p>
+
+    <span class="manager-link">
+        Manage Managers →
+    </span>
+
+</div>
+        </div>
+
+
+
+        <!-- =================================================
+             ADD BOOK FORM
+        ================================================== -->
+
+        <h2>
+            Add New Book
+        </h2>
+
+
+        <form
+            class="admin-form"
+            onsubmit="addBook(event)">
+
+
+            <input
+                type="text"
+                id="bookTitle"
+                placeholder="Book Title"
+                required
+            >
+
+
+            <input
+                type="text"
+                id="bookAuthor"
+                placeholder="Author Name"
+                required
+            >
+
+
+            <input
+                type="number"
+                id="bookPrice"
+                placeholder="Price ₹"
+                min="1"
+                required
+            >
+
+
+            <!-- ADMIN CATEGORY -->
+            <select
+    id="bookCategory"
+    onchange="loadBookSubcategories()"
+    required
+>
+    <option value="" disabled selected>
+        Select Category
+    </option>
+</select>
+<!-- ADMIN SUBCATEGORY -->
+
+<!-- ADMIN SUBCATEGORIES -->
+
+<div class="book-subcategory-box">
+
+    <label class="subcategory-label">
+        Select Subcategories
+    </label>
+
+    <div
+        id="bookSubcategoryList"
+        class="book-subcategory-list"
+    >
+        <p class="subcategory-help">
+            Select a category first.
+        </p>
+    </div>
+
+</div>
+
+            <input
+                type="number"
+                id="bookStock"
+                placeholder="Stock"
+                min="0"
+                required
+            >
+
+
+            <input
+                type="text"
+                id="bookImage"
+                placeholder="Book Image URL"
+                required
+            >
+
+
+            <button
+                type="submit"
+                class="btn">
+
+                + Add Book
+
+            </button>
+
+        </form>
+
+
+
+        <!-- =================================================
+             CATEGORY MANAGEMENT
+        ================================================== -->
+
+        <div class="category-management">
+
+
+            <h2>
+                Manage Book Categories
+            </h2>
+
+
+            <div class="category-add-box">
+
+
+                <input
+                    type="text"
+                    id="newCategory"
+                    placeholder="Enter new category"
+                >
+
+
+                <button
+                    type="button"
+                    onclick="addCategory()">
+
+                    + Add Category
+
+                </button>
+
+            </div>
+
+
+            <div id="categoryList"></div>
+
+    
+
+<!-- =====================================================
+     MANAGE SUBCATEGORIES
+===================================================== -->
+
+<div class="subcategory-management">
+
+    <h2>Manage Subcategories</h2>
+
+    <p>
+        Select a book category and add its subcategories.
+    </p>
+
+    <br>
+
+    <!-- CATEGORY SELECT -->
+
+    <select
+        id="subcategoryCategory"
+        onchange="displaySubcategories()"
+    >
+        <option value="">
+            Select Category
+        </option>
+    </select>
+
+
+    <br><br>
+
+
+    <!-- ADD SUBCATEGORY -->
+
+    <div class="category-add-row">
+
+        <input
+            type="text"
+            id="newSubcategory"
+            placeholder="Enter new subcategory"
+        >
+
+        <button
+            type="button"
+            class="btn"
+            onclick="addSubcategory()"
+        >
+            + Add Subcategory
+        </button>
+
+    </div>
+
+
+    <!-- SUBCATEGORY LIST -->
+
+    <div id="subcategoryList">
+
+    </div>
+
+</div>
+        </div>
+
+
+<br><br>
+
+
+        <!-- =================================================
+             MANAGE BOOKS
+        ================================================== -->
+
+        <h2>
+            Manage Books
+        </h2>
+
+
+        <br>
+
+
+        <div
+            id="adminBooks"
+            class="admin-books">
+
+            <!-- JavaScript loads Admin books -->
+
+        </div>
+
+
+        <br>
+
+
+        <!-- ADMIN LOGOUT -->
+
+<button
+    class="mng"
+    onclick="adminLogout()">
+
+    Admin Logout
+
+</button>
+
+
+<!-- CLOSE ADMIN DASHBOARD -->
+
+</section>
+
+</div>
+
+
+<!-- =====================================================
+     MANAGER MANAGEMENT PAGE - ADMIN ONLY
+===================================================== -->
+
+<div id="managersPage" class="page">
+
+    <section class="section">
+
+        <button
+            class="btn"
+            onclick="showPage('admin')">
+
+            ← Back to Admin
+
+        </button>
+
+        <h1 class="section-title">
+            👨‍💼 Manager Management
+        </h1>
+
+        <p class="manager-page-description">
+            Approve, edit, disable or remove Manager accounts.
+        </p>
+
+        <div
+            id="managersList"
+            class="manager-details-container">
+
+            <!-- Manager details generated by JavaScript -->
+
+        </div>
+
+    </section>
+
+</div>
+    
+
+
+<!-- =====================================================
+     MANAGER DASHBOARD
+===================================================== -->
+
+<div id="managerDashboard" class="page">
+
+    <section class="admin-dashboard">
+
+        <h1>
+            👨‍💼 Manager Dashboard
+        </h1>
+        <button
+            class="mng"
+            onclick="managerLogout()">
+
+            Manager Logout
+
+        </button>
+        <br>
+
+        <p id="managerWelcome">
+            Manage stock and monitor customer activity.
+        </p>
+
+        
+
+        <!-- MANAGER STATISTICS -->
+
+        <div class="dashboard-cards">
+
+            <div class="dashboard-card">
+
+                <h3>📚 Total Books</h3>
+
+                <p id="managerTotalBooks">
+                    0
+                </p>
+
+            </div>
+
+
+            <div class="dashboard-card">
+
+                <h3>📦 Total Stock</h3>
+
+                <p id="managerTotalStock">
+                    0
+                </p>
+
+            </div>
+
+
+            <div class="dashboard-card">
+
+                <h3>👥 Customers</h3>
+
+                <p id="managerTotalCustomers">
+                    0
+                </p>
+
+            </div>
+
+
+            <div class="dashboard-card">
+
+                <h3>🛒 Orders</h3>
+
+                <p id="managerTotalOrders">
+                    0
+                </p>
+
+            </div>
+
+
+        </div>
+
+
+            <div
+    id="managerPaymentPermissionCard"
+    class="manager-dashboard-card"
+    style="display: none;"
+>
+
+    <h3>
+        💳 Customer Payments
+    </h3>
+
+    <p>
+        Verify customer UPI payments
+        and transaction details.
+    </p>
+
+    <button
+        type="button"
+        class="btn"
+        onclick="showManagerPaymentVerification()"
+    >
+        View Payment Verification
+    </button>
+
+</div>
+        <div
+    id="managerPaymentVerification"
+    class="manager-payment-verification"
+    style="display: none;"
+>
+
+    <div class="manager-payment-header">
+
+        <h2>
+            💳 Customer Payment Verification
+        </h2>
+
+        <button
+            type="button"
+            class="btn"
+            onclick="closeManagerPaymentVerification()"
+        >
+            ← Back to Dashboard
+        </button>
+
+    </div>
+
+
+    <p>
+        Review pending customer UPI payments
+        before confirming their orders.
+    </p>
+
+
+    <div id="managerPaymentOrders">
+
+        <p>
+            No pending payments.
+        </p>
+
+    </div>
+
+</div>
+
+
+        <!-- STOCK MANAGEMENT -->
+
+        <h2>
+            📦 Stock Management
+        </h2>
+
+        <div
+            id="managerStockList"
+            class="manager-stock-container">
+        </div>
+
+    
+        <!-- CUSTOMER ACTIVITY -->
+
+        <h2 class="manager-section-title">
+            👥 Customer Activity
+        </h2>
+
+        <div
+            id="managerCustomerActivity"
+            class="manager-activity-container">
+        </div>
+
+
+        <br>
+
+        
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+     CUSTOMER DETAILS PAGE
+===================================================== -->
+
+<div id="customersPage" class="page">
+
+
+    <section class="section">
+
+
+        <button
+            class="btn"
+            onclick="showPage('admin')">
+
+            ← Back to Admin
+
+        </button>
+
+
+        <h1 class="section-title">
+            👥 Customer Details
+        </h1>
+
+
+        <div
+            id="customersList"
+            class="customer-details-container">
+
+            <!-- Customer information generated by JS -->
+
+        </div>
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+     BOOK DETAILS PAGE
+===================================================== -->
+
+<div id="booksPage" class="page">
+
+
+    <section class="section">
+
+
+        <button
+            class="btn"
+            onclick="showPage('admin')">
+
+            ← Back to Admin
+
+        </button>
+
+
+        <h1 class="section-title">
+            📚 Book Details
+        </h1>
+
+
+        <div
+            id="bookDetailsList"
+            class="book-details-container">
+
+            <!-- Book details generated by JavaScript -->
+
+        </div>
+
+
+        <!--
+            Order/customer information related to books
+            is displayed separately at the bottom.
+        -->
+
+        <div
+            id="bookOrderDetails"
+            class="book-order-details-container">
+
+        </div>
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+     ORDER DETAILS PAGE
+===================================================== -->
+
+<div id="ordersPage" class="page">
+
+
+    <section class="section">
+
+
+        <button
+            class="btn"
+            onclick="showPage('admin')">
+
+            ← Back to Admin
+
+        </button>
+
+
+        <h1 class="section-title">
+            📦 Order Details
+        </h1>
+
+
+        <div
+            id="ordersList"
+            class="order-details-container">
+
+            <!-- Order information generated by JavaScript -->
+
+        </div>
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+     PURCHASE HISTORY PAGE
+===================================================== -->
+
+<div id="history" class="page">
+
+
+    <section class="section">
+
+
+        <h1 class="section-title">
+            📜 Purchase History
+        </h1>
+
+
+        <!-- TOTAL PURCHASE COUNT -->
+
+        <div class="total-purchase-box">
+
+            <h3>
+
+                Total Number of Purchases:
+
+                <span id="totalPurchases">
+                    0
+                </span>
+
+            </h3>
+
+        </div>
+
+
+        <br>
+
+
+        <!-- PURCHASE HISTORY -->
+
+        <div
+            id="historyContainer"
+            class="history-container">
+
+            <!-- JavaScript loads purchase history -->
+
+        </div>
+
+
+        <br>
+
+
+        <button
+            class="btn"
+            onclick="showPage('home')">
+
+            ← Back to Store
+
+        </button>
+
+    </section>
+
+</div>
+
+
+
+<!-- =====================================================
+     FOOTER
+===================================================== -->
+
+<footer>
+
+    <p>
+        © 2026 RV Book Store | Online Book Store
+    </p>
+
+</footer>
+
+<!-- =====================================================
+     EDIT BOOK SUBCATEGORY MODAL
+===================================================== -->
+
+<div id="editBookSubcategoryModal"
+     class="edit-subcategory-modal">
+
+    <div class="edit-subcategory-modal-content">
+
+        <h2>
+            Select Subcategories
+        </h2>
+
+        <p id="editBookSubcategoryBookName">
+            Book Name
+        </p>
+
+        <!-- CHECKBOXES WILL BE ADDED HERE BY JAVASCRIPT -->
+
+        <div id="editBookSubcategoryList"
+             class="book-subcategory-list">
+        </div>
+
+        <div class="edit-subcategory-buttons">
+
+            <button type="button"
+                    onclick="saveEditedBookSubcategories()">
+                Save
+            </button>
+
+            <button type="button"
+                    onclick="closeEditBookSubcategoryModal()">
+                Cancel
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/12.2.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore-compat.js"></script>
+<!-- =====================================================
+     JAVASCRIPT FILE
+===================================================== -->
+
+<script src="script.js"></script>
+
+
+</body>
+
+</html>
