@@ -2399,7 +2399,7 @@ catch (error) {
    DELETE CATEGORY
 ===================================================== */
 
-function deleteCategory(index) {
+async function deleteCategory(index) {
 
     let categories =
         getCategories();
@@ -2452,10 +2452,42 @@ function deleteCategory(index) {
     );
 
 
+   /* =========================================
+   DELETE CATEGORY FROM FIRESTORE
+========================================= */
+
+try {
+
+    await db.collection("settings")
+        .doc("categories")
+        .set({
+            items: categories
+        });
+
     localStorage.setItem(
         "categories",
         JSON.stringify(categories)
     );
+
+    console.log(
+        "Category deleted from Firestore:",
+        category
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error deleting category:",
+        error
+    );
+
+    alert(
+        "Category could not be deleted."
+    );
+
+    return;
+}
 
 
     refreshCategories();
