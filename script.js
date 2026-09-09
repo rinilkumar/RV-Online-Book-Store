@@ -6368,17 +6368,35 @@ function addBook(event) {
     };
 
 
-    let books =
-        getBooks();
+    /* SAVE BOOK TO FIRESTORE */
 
+db.collection("books")
+    .doc(String(book.id))
+    .set(book)
+    .then(function () {
 
-    books.push(book);
+        console.log(
+            "Book saved to Firestore:",
+            book
+        );
 
+        alert(
+            "Book added successfully."
+        );
 
-    localStorage.setItem(
-        "books",
-        JSON.stringify(books)
-    );
+    })
+    .catch(function (error) {
+
+        console.error(
+            "Error adding book:",
+            error
+        );
+
+        alert(
+            "Book could not be added."
+        );
+
+    });
 
 
     event.target.reset();
@@ -6410,9 +6428,6 @@ function addBook(event) {
     updateDashboard();
 
 
-    alert(
-        "Book added successfully."
-    );
 }
 
 /* =====================================================
