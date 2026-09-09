@@ -9701,3 +9701,15 @@ document.addEventListener(
         showPage("home");
     }
 );
+
+// Test connection to Firestore
+db.collection("test").add({
+    status: "Connected successfully!",
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+})
+.then((docRef) => {
+    console.log("Firebase connection successful! Test ID:", docRef.id);
+})
+.catch((error) => {
+    console.error("Firebase connection error:", error);
+});
