@@ -4,9 +4,9 @@
 
 const firebaseConfig = {
     apiKey: "AIzaSyAxT0mir0lX3CWQAEZrm9mxezrEFh89mSg",
-    authDomain: "rv-online-book--store.firebaseapp.com",
-    projectId: "rv-online-book--store",
-    storageBucket: "rv-online-book--store.firebasestorage.app",
+    authDomain: "rv-online-book-store.firebaseapp.com",
+projectId: "rv-online-book-store",
+storageBucket: "rv-online-book-store.firebasestorage.app",
     messagingSenderId: "790951541824",
     appId: "1:790951541824:web:60e8826e852b65a7daf3a5",
     measurementId: "G-V5ETHTRX6Q"
