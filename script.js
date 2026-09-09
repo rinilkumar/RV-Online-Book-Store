@@ -1657,7 +1657,7 @@ function displaySubcategories() {
    EDIT SUBCATEGORY
 ===================================================== */
 
-function editSubcategory(
+async function editSubcategory(
     category,
     oldSubcategory
 ) {
@@ -1737,65 +1737,122 @@ function editSubcategory(
         list;
 
 
+  /* =========================================
+   UPDATE SUBCATEGORIES IN FIRESTORE
+========================================= */
+
+try {
+
+    await db.collection("settings")
+        .doc("subcategories")
+        .set({
+            items: allSubcategories
+        });
+
     localStorage.setItem(
-    "subcategories",
-    JSON.stringify(allSubcategories)
-);
+        "subcategories",
+        JSON.stringify(allSubcategories)
+    );
+
+    console.log(
+        "Subcategory updated in Firestore:",
+        oldSubcategory,
+        "->",
+        cleanedName
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error updating subcategory:",
+        error
+    );
+
+    alert(
+        "Subcategory could not be updated."
+    );
+
+    return;
+}
 
 
-/* =====================================================
-   UPDATE SUBCATEGORY NAME INSIDE BOOKS
-===================================================== */
+/* =========================================
+   UPDATE SUBCATEGORY NAME INSIDE FIRESTORE BOOKS
+========================================= */
 
-let books = getBooks();
+try {
 
+    const snapshot =
+        await db.collection("books")
+            .where(
+                "category",
+                "==",
+                category
+            )
+            .get();
 
-books.forEach(function (book) {
+    const batch =
+        db.batch();
 
-    /* Only update books from this category */
+    snapshot.forEach(function (doc) {
 
-    if (book.category !== category) {
-        return;
-    }
+        const book =
+            doc.data();
 
+        const bookSubcategories =
+            Array.isArray(book.subcategories)
+                ? book.subcategories
+                : book.subcategory
+                    ? [book.subcategory]
+                    : [];
 
-    /* SUPPORT OLD + NEW BOOK STRUCTURE */
+        const updatedSubcategories =
+            bookSubcategories.map(
+                function (item) {
 
-    const bookSubcategories =
-        Array.isArray(book.subcategories)
-            ? book.subcategories
-            : book.subcategory
-                ? [book.subcategory]
-                : [];
+                    return item === oldSubcategory
+                        ? cleanedName
+                        : item;
+                }
+            );
 
+        batch.update(
+            doc.ref,
+            {
+                subcategories:
+                    updatedSubcategories,
 
-    /* REPLACE OLD NAME WITH NEW NAME */
-
-    book.subcategories =
-        bookSubcategories.map(
-            function (item) {
-
-                return item === oldSubcategory
-                    ? cleanedName
-                    : item;
-
+                subcategory:
+                    firebase.firestore.FieldValue.delete()
             }
         );
 
+    });
 
-    /* REMOVE OLD SINGLE SUBCATEGORY PROPERTY */
+    await batch.commit();
 
-    delete book.subcategory;
+    console.log(
+        "Book subcategories updated:",
+        oldSubcategory,
+        "->",
+        cleanedName
+    );
 
-});
+}
+catch (error) {
 
+    console.error(
+        "Error updating book subcategories:",
+        error
+    );
 
-/* SAVE UPDATED BOOKS */
+    alert(
+        "Subcategory was renamed, but some books could not be updated."
+    );
 
-localStorage.setItem(
-    "books",
-    JSON.stringify(books)
-);
+    return;
+}
 
 
 /* REFRESH WEBSITE */
