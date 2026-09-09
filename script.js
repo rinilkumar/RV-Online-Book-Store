@@ -7157,7 +7157,7 @@ openEditBookSubcategoryModal(
    DELETE BOOK
 ===================================================== */
 
-function deleteBook(bookId) {
+async function deleteBook(bookId) {
 
     if (
         !confirm(
@@ -7167,27 +7167,35 @@ function deleteBook(bookId) {
         return;
     }
 
+/* =========================================
+   DELETE BOOK FROM FIRESTORE
+========================================= */
 
-    let books =
-        getBooks();
+try {
 
+    await db.collection("books")
+        .doc(String(bookId))
+        .delete();
 
-    books =
-        books.filter(
-            function (book) {
-
-                return (
-                    String(book.id) !==
-                    String(bookId)
-                );
-            }
-        );
-
-
-    localStorage.setItem(
-        "books",
-        JSON.stringify(books)
+    console.log(
+        "Book deleted from Firestore:",
+        bookId
     );
+
+}
+catch (error) {
+
+    console.error(
+        "Error deleting book:",
+        error
+    );
+
+    alert(
+        "Book could not be deleted."
+    );
+
+    return;
+}
 
 
     displayAdminBooks();
