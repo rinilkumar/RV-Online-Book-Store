@@ -1402,7 +1402,7 @@ function loadSubcategoryCategories() {
    ADD SUBCATEGORY
 ===================================================== */
 
-function addSubcategory() {
+async function addSubcategory() {
 
     const categorySelect =
         document.getElementById("subcategoryCategory");
@@ -1473,11 +1473,42 @@ function addSubcategory() {
     );
 
 
+   /* =========================================
+   SAVE SUBCATEGORIES TO FIRESTORE
+========================================= */
+
+try {
+
+    await db.collection("settings")
+        .doc("subcategories")
+        .set({
+            items: allSubcategories
+        });
+
     localStorage.setItem(
         "subcategories",
         JSON.stringify(allSubcategories)
     );
 
+    console.log(
+        "Subcategories saved to Firestore:",
+        allSubcategories
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error saving subcategory:",
+        error
+    );
+
+    alert(
+        "Subcategory could not be saved."
+    );
+
+    return;
+}
 
     input.value = "";
 
