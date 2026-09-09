@@ -6498,7 +6498,7 @@ db.collection("books")
    DISPLAY ADMIN BOOKS
 ===================================================== */
 
-function displayAdminBooks() {
+async function displayAdminBooks() {
 
     const container =
         document.getElementById(
@@ -6510,8 +6510,42 @@ function displayAdminBooks() {
     }
 
 
-    const books =
-        getBooks();
+    let books = [];
+
+try {
+
+    const snapshot =
+        await db.collection("books").get();
+
+    snapshot.forEach(function (doc) {
+
+        const data = doc.data();
+
+        books.push({
+            ...data,
+            id:
+                data.id !== undefined
+                    ? data.id
+                    : doc.id
+        });
+
+    });
+
+    console.log(
+        "Admin books loaded from Firestore:",
+        books
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading admin books:",
+        error
+    );
+
+    books = getBooks();
+}
 
 
     container.innerHTML = "";
