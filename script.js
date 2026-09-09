@@ -2383,7 +2383,7 @@ function refreshCategories() {
    DISPLAY BOOKS
 ===================================================== */
 
-function displayBooks() {
+async function displayBooks() {
 
     const container =
         document.getElementById(
@@ -2430,8 +2430,72 @@ function displayBooks() {
             : "all";
 
 
-    const books =
-        getBooks();
+   /* =========================================
+   LOAD BOOKS FROM FIRESTORE
+========================================= */
+
+let books = [];
+
+try {
+
+    const snapshot =
+        await db.collection("books").get();
+
+    snapshot.forEach(function (doc) {
+
+        const data = doc.data();
+
+        books.push({
+            ...data,
+
+            /*
+               If the book already has an ID,
+               keep it.
+
+               Otherwise use Firestore's
+               document ID.
+            */
+            id:
+                data.id !== undefined
+                    ? data.id
+                    : doc.id
+        });
+
+    });
+
+
+    /* =========================================
+       KEEP LOCAL COPY FOR CART + OLD FUNCTIONS
+    ========================================= */
+
+    localStorage.setItem(
+        "books",
+        JSON.stringify(books)
+    );
+
+
+    console.log(
+        "Books loaded from Firestore:",
+        books
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading books from Firestore:",
+        error
+    );
+
+
+    /*
+       If internet/Firestore has a temporary
+       problem, use the old local copy.
+    */
+
+    books = getBooks();
+
+}
 
 
     const filtered =
