@@ -6858,7 +6858,7 @@ function closeEditBookSubcategoryModal() {
    SAVE EDITED BOOK WITH SELECTED SUBCATEGORIES
 ===================================================== */
 
-function saveEditedBookSubcategories() {
+async function saveEditedBookSubcategories() {
 
     /* CHECK EDITING DATA */
 
@@ -6916,47 +6916,38 @@ function saveEditedBookSubcategories() {
     delete editingBookData.subcategory;
 
 
-    /* GET BOOKS */
+   /* =========================================
+   UPDATE BOOK IN FIRESTORE
+========================================= */
 
-    let books =
-        getBooks();
+try {
 
-
-    /* FIND BOOK */
-
-    const index =
-        books.findIndex(
-            function (book) {
-
-                return book.id ===
-                    editingBookId;
-
-            }
+    await db.collection("books")
+        .doc(String(editingBookId))
+        .set(
+            editingBookData,
+            { merge: true }
         );
 
-
-    if (index === -1) {
-
-        alert(
-            "Book not found."
-        );
-
-        return;
-    }
-
-
-    /* REPLACE OLD BOOK */
-
-    books[index] =
-        editingBookData;
-
-
-    /* SAVE */
-
-    localStorage.setItem(
-        "books",
-        JSON.stringify(books)
+    console.log(
+        "Book updated in Firestore:",
+        editingBookData
     );
+
+}
+catch (error) {
+
+    console.error(
+        "Error updating book:",
+        error
+    );
+
+    alert(
+        "Book could not be updated."
+    );
+
+    return;
+}
 
 
     /* CLOSE MODAL */
