@@ -2122,7 +2122,7 @@ function displayCategories() {
    ADD CATEGORY
 ===================================================== */
 
-function addCategory() {
+async function addCategory() {
 
     const input =
         document.getElementById(
@@ -2174,19 +2174,56 @@ function addCategory() {
     }
 
 
-    categories.push(category);
+   categories.push(category);
 
+
+/* =========================================
+   SAVE CATEGORIES TO FIRESTORE
+========================================= */
+
+try {
+
+    await db.collection("settings")
+        .doc("categories")
+        .set({
+            items: categories
+        });
+
+    /* Keep local copy for old functions */
 
     localStorage.setItem(
         "categories",
         JSON.stringify(categories)
     );
 
+    console.log(
+        "Categories saved to Firestore:",
+        categories
+    );
 
-    input.value = "";
+}
+catch (error) {
+
+    console.error(
+        "Error saving categories:",
+        error
+    );
+
+    alert(
+        "Category could not be saved."
+    );
+
+    return;
+}
 
 
-    refreshCategories();
+input.value = "";
+
+refreshCategories();
+
+alert(
+    "Category added successfully."
+);
 }
 
 
