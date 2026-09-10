@@ -10398,6 +10398,74 @@ async function loadCategoriesFromFirestore() {
     }
 }
 
+
+/* =====================================================
+   RESTORE CUSTOMER SESSION
+===================================================== */
+
+function restoreCustomerSession() {
+
+    auth.onAuthStateChanged(
+        async function (user) {
+
+            if (user) {
+
+                try {
+
+                    const customerDoc =
+                        await db.collection("customers")
+                            .doc(user.uid)
+                            .get();
+
+
+                    if (customerDoc.exists) {
+
+                        const customer =
+                            customerDoc.data();
+
+
+                        localStorage.setItem(
+                            "currentCustomer",
+                            JSON.stringify(customer)
+                        );
+
+
+                        console.log(
+                            "Customer session restored:",
+                            customer
+                        );
+
+
+                        updateNavigation();
+
+                    }
+
+                }
+                catch (error) {
+
+                    console.error(
+                        "Session restore error:",
+                        error
+                    );
+
+                }
+
+            }
+            else {
+
+                localStorage.removeItem(
+                    "currentCustomer"
+                );
+
+                updateNavigation();
+
+            }
+
+        }
+    );
+}
+
+
 /* =====================================================
    START WEBSITE
 ===================================================== */
