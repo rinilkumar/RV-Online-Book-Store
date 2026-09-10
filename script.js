@@ -4069,7 +4069,7 @@ function copyAdminUpiId() {
         });
 }
 
-function confirmOnlinePayment() {
+async function confirmOnlinePayment() {
 
     const customer =
         getCurrentCustomer();
