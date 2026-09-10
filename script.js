@@ -3,13 +3,13 @@
 ===================================================== */
 
 const firebaseConfig = {
-    apiKey: "AIzaSyAxT0mir0lX3CWQAEZrm9mxezrEFh89mSg",
-    authDomain: "rv-online-book-store.firebaseapp.com",
-projectId: "rv-online-book-store",
-storageBucket: "rv-online-book-store.firebasestorage.app",
-    messagingSenderId: "790951541824",
-    appId: "1:790951541824:web:60e8826e852b65a7daf3a5",
-    measurementId: "G-V5ETHTRX6Q"
+  apiKey: "AIzaSyAELLyysW27PRCT53FjYLtJEw9pYv9rvpA",
+  authDomain: "rv-online-book-store.firebaseapp.com",
+  projectId: "rv-online-book-store",
+  storageBucket: "rv-online-book-store.firebasestorage.app",
+  messagingSenderId: "831703685308",
+  appId: "1:831703685308:web:2ae98e159d7b6e863598b9",
+  measurementId: "G-XSW4X7X62P"
 };
 
 /* Initialize Firebase */
