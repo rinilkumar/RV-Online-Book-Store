@@ -4263,12 +4263,25 @@ function confirmOnlinePayment() {
     };
 
 
-    // ==========================================
-    // SAVE ORDER
-    // ==========================================
+   // ==========================================
+// SAVE ORDER TO FIRESTORE
+// ==========================================
+
+try {
+
+    await db.collection("orders")
+        .doc(String(order.id))
+        .set(order);
+
+    console.log(
+        "UPI order saved to Firestore:",
+        order
+    );
+
+
+    // Keep local copy for existing functions
 
     orders.push(order);
-
 
     localStorage.setItem(
         "orders",
@@ -4276,17 +4289,27 @@ function confirmOnlinePayment() {
     );
 
 
-  
-
-
-    // ==========================================
-    // SAVE LATEST ORDER
-    // ==========================================
+    // Save latest order for receipt
 
     localStorage.setItem(
         "latestOrder",
         JSON.stringify(order)
     );
+
+}
+catch (error) {
+
+    console.error(
+        "Error saving UPI order:",
+        error
+    );
+
+    alert(
+        "Order could not be saved. Please try again."
+    );
+
+    return;
+}
 
 
     // ==========================================
@@ -4335,7 +4358,7 @@ function confirmOnlinePayment() {
    PROCESS PAYMENT
 ===================================================== */
 
-function processPayment() {
+async function processPayment() {
 
     const customer =
         getCurrentCustomer();
@@ -4437,19 +4460,49 @@ function processPayment() {
                 .toLocaleString()
     };
 
+let orders =
+    getOrders();
 
-    let orders =
-        getOrders();
 
+// ==========================================
+// SAVE COD ORDER TO FIRESTORE
+// ==========================================
+
+try {
+
+    await db.collection("orders")
+        .doc(String(order.id))
+        .set(order);
+
+    console.log(
+        "COD order saved to Firestore:",
+        order
+    );
+
+
+    // Keep local copy for existing functions
 
     orders.push(order);
-
 
     localStorage.setItem(
         "orders",
         JSON.stringify(orders)
     );
 
+}
+catch (error) {
+
+    console.error(
+        "Error saving COD order:",
+        error
+    );
+
+    alert(
+        "Order could not be saved. Please try again."
+    );
+
+    return;
+}
 
     /*
        Reduce stock BEFORE clearing cart.
