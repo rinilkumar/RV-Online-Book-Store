@@ -18,6 +18,8 @@ firebase.initializeApp(firebaseConfig);
 /* Connect to Firestore */
 const db = firebase.firestore();
 
+const auth = firebase.auth();
+
 console.log("Firebase connected successfully");
 console.log(db);
 
@@ -790,10 +792,10 @@ function togglePassword(inputId, button) {
 
 
 /* =====================================================
-   CUSTOMER REGISTER
+   CUSTOMER REGISTER - FIREBASE AUTH + FIRESTORE
 ===================================================== */
 
-function registerCustomer(event) {
+async function registerCustomer(event) {
 
     event.preventDefault();
 
@@ -822,80 +824,141 @@ function registerCustomer(event) {
             .value;
 
 
-    let customers =
-        getCustomers();
-
-
-    const exists =
-        customers.some(function (customer) {
-
-            return String(customer.email)
-                .toLowerCase() === email;
-        });
-
-
-    if (exists) {
+    if (!name || !email || !phone || !password) {
 
         alert(
-            "Customer already registered with this email."
+            "Please fill all registration fields."
         );
 
         return;
     }
 
 
-    const customer = {
+    try {
 
-        id: Date.now(),
+        /* CREATE FIREBASE AUTH ACCOUNT */
 
-        name: name,
-
-        email: email,
-
-        phone: phone,
-
-        password: password,
-
-        address: null
-    };
+        const credential =
+            await auth
+                .createUserWithEmailAndPassword(
+                    email,
+                    password
+                );
 
 
-    customers.push(customer);
+        const user =
+            credential.user;
 
 
-    localStorage.setItem(
-        "customers",
-        JSON.stringify(customers)
-    );
+        /* CUSTOMER PROFILE */
+
+        const customer = {
+
+            id: user.uid,
+
+            name: name,
+
+            email: email,
+
+            phone: phone,
+
+            address: null,
+
+            registeredDate:
+                new Date().toLocaleString()
+
+        };
 
 
-    alert(
-        "Registration successful. Please login."
-    );
+        /* SAVE PROFILE TO FIRESTORE */
+
+        await db.collection("customers")
+            .doc(user.uid)
+            .set(customer);
 
 
-    event.target.reset();
+        console.log(
+            "Customer registered:",
+            customer
+        );
 
 
-    document.getElementById(
-        "loginEmail"
-    ).value = email;
+        event.target.reset();
 
 
-    showAccountForm(
-        "customerLoginForm"
-    );
+        document.getElementById(
+            "loginEmail"
+        ).value = email;
 
 
-    updateDashboard();
+        alert(
+            "Registration successful. Please login."
+        );
+
+
+        showAccountForm(
+            "customerLoginForm"
+        );
+
+
+        updateDashboard();
+
+    }
+    catch (error) {
+
+        console.error(
+            "Customer registration error:",
+            error
+        );
+
+
+        if (
+            error.code ===
+            "auth/email-already-in-use"
+        ) {
+
+            alert(
+                "This email is already registered."
+            );
+
+        }
+        else if (
+            error.code ===
+            "auth/weak-password"
+        ) {
+
+            alert(
+                "Password must contain at least 6 characters."
+            );
+
+        }
+        else if (
+            error.code ===
+            "auth/invalid-email"
+        ) {
+
+            alert(
+                "Please enter a valid email address."
+            );
+
+        }
+        else {
+
+            alert(
+                "Registration failed: " +
+                error.message
+            );
+
+        }
+    }
 }
 
 
 /* =====================================================
-   CUSTOMER LOGIN
+   CUSTOMER LOGIN - FIREBASE AUTH
 ===================================================== */
 
-function customerLogin(event) {
+async function customerLogin(event) {
 
     event.preventDefault();
 
@@ -912,72 +975,142 @@ function customerLogin(event) {
             .value;
 
 
-    const customers =
-        getCustomers();
+    try {
+
+        /* LOGIN USING FIREBASE AUTH */
+
+        const credential =
+            await auth
+                .signInWithEmailAndPassword(
+                    email,
+                    password
+                );
 
 
-    const customer =
-        customers.find(function (item) {
+        const user =
+            credential.user;
 
-            return (
-                String(item.email)
-                    .toLowerCase() === email
-                &&
-                item.password === password
+
+        /* GET CUSTOMER PROFILE */
+
+        const customerDoc =
+            await db.collection("customers")
+                .doc(user.uid)
+                .get();
+
+
+        if (!customerDoc.exists) {
+
+            alert(
+                "Customer profile not found."
             );
-        });
+
+            await auth.signOut();
+
+            return;
+        }
 
 
-    if (!customer) {
+        const customer =
+            customerDoc.data();
 
-        alert(
-            "Invalid email or password."
+
+        /* KEEP LOCAL COPY FOR EXISTING WEBSITE */
+
+        localStorage.setItem(
+            "currentCustomer",
+            JSON.stringify(customer)
         );
 
-        return;
+
+        console.log(
+            "Customer logged in:",
+            customer
+        );
+
+
+        event.target.reset();
+
+
+        updateNavigation();
+
+
+        alert(
+            "Welcome " +
+            customer.name +
+            "!"
+        );
+
+
+        showPage("home");
+
     }
+    catch (error) {
+
+        console.error(
+            "Customer login error:",
+            error
+        );
 
 
-    localStorage.setItem(
-        "currentCustomer",
-        JSON.stringify(customer)
-    );
+        if (
+            error.code ===
+            "auth/invalid-credential"
+        ) {
 
+            alert(
+                "Invalid email or password."
+            );
 
-    event.target.reset();
+        }
+        else {
 
+            alert(
+                "Login failed: " +
+                error.message
+            );
 
-    updateNavigation();
+        }
 
-
-    alert(
-        "Welcome " + customer.name + "!"
-    );
-
-
-    showPage("home");
+    }
 }
-
 
 /* =====================================================
    CUSTOMER LOGOUT
 ===================================================== */
 
-function customerLogout() {
+async function customerLogout() {
 
-    localStorage.removeItem(
-        "currentCustomer"
-    );
+    try {
 
-    updateNavigation();
+        await auth.signOut();
 
-    showPage("home");
+        localStorage.removeItem(
+            "currentCustomer"
+        );
 
-    alert(
-        "Customer logged out successfully."
-    );
+        updateNavigation();
+
+        showPage("home");
+
+        alert(
+            "Customer logged out successfully."
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Logout error:",
+            error
+        );
+
+        alert(
+            "Logout failed."
+        );
+
+    }
 }
-
 
 /* =====================================================
    NAVIGATION
@@ -3610,7 +3743,7 @@ function setField(id, value) {
    SAVE DELIVERY ADDRESS
 ===================================================== */
 
-function saveDeliveryAddress(event) {
+async function saveDeliveryAddress(event) {
 
     event.preventDefault();
 
@@ -3681,34 +3814,44 @@ function saveDeliveryAddress(event) {
     );
 
 
-    let customers =
-        getCustomers();
+   /* =========================================
+   SAVE ADDRESS TO FIRESTORE
+========================================= */
+
+try {
+
+    await db.collection("customers")
+        .doc(String(customer.id))
+        .update({
+            address: address
+        });
 
 
-    const index =
-        customers.findIndex(
-            function (item) {
-
-                return (
-                    String(item.id) ===
-                    String(customer.id)
-                );
-            }
-        );
+    localStorage.setItem(
+        "currentCustomer",
+        JSON.stringify(customer)
+    );
 
 
-    if (index !== -1) {
+    console.log(
+        "Customer address saved:",
+        address
+    );
 
-        customers[index].address =
-            address;
+}
+catch (error) {
 
+    console.error(
+        "Address save error:",
+        error
+    );
 
-        localStorage.setItem(
-            "customers",
-            JSON.stringify(customers)
-        );
-    }
+    alert(
+        "Address could not be saved."
+    );
 
+    return;
+}
 
     updatePaymentTotal();
 
@@ -8650,7 +8793,7 @@ function openOrdersPage() {
    CUSTOMER DETAILS
 ===================================================== */
 
-function displayCustomers() {
+async function displayCustomers() {
 
     const container =
         document.getElementById(
@@ -8662,9 +8805,49 @@ function displayCustomers() {
     }
 
 
-    const customers =
+   let customers = [];
+
+try {
+
+    const snapshot =
+        await db.collection("customers")
+            .get();
+
+
+    snapshot.forEach(
+        function (doc) {
+
+            customers.push(
+                doc.data()
+            );
+
+        }
+    );
+
+
+    localStorage.setItem(
+        "customers",
+        JSON.stringify(customers)
+    );
+
+
+    console.log(
+        "Customers loaded from Firestore:",
+        customers
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading customers:",
+        error
+    );
+
+    customers =
         getCustomers();
 
+}
 
     container.innerHTML = "";
 
@@ -10098,51 +10281,67 @@ async function loadSubcategoriesFromFirestore() {
 
     }
 }
+
 /* =====================================================
-   START WEBSITE
+   RESTORE FIREBASE CUSTOMER SESSION
 ===================================================== */
 
-document.addEventListener(
-    "DOMContentLoaded",
-    async function () {
+function restoreCustomerSession() {
 
-        initializeStorage();
+    auth.onAuthStateChanged(
+        async function (user) {
 
-        initializeManagerPermissions();
+            if (user) {
 
-       await loadCategoriesFromFirestore();
+                try {
 
-       await loadSubcategoriesFromFirestore();
+                    const customerDoc =
+                        await db
+                            .collection("customers")
+                            .doc(user.uid)
+                            .get();
 
-        loadCategoryFilter();
 
-        loadAdminCategories();
+                    if (customerDoc.exists) {
 
-        updateNavigation();
+                        const customer =
+                            customerDoc.data();
 
-        updateCartCount();
 
-        displayBooks();
+                        localStorage.setItem(
+                            "currentCustomer",
+                            JSON.stringify(customer)
+                        );
 
-        displayCart();
 
-        updateDashboard();
+                        updateNavigation();
 
-        showPage("home");
-    }
-);
+                    }
 
-// Test connection to Firestore
-db.collection("test").add({
-    status: "Connected successfully!",
-    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-})
-.then((docRef) => {
-    console.log("Firebase connection successful! Test ID:", docRef.id);
-})
-.catch((error) => {
-    console.error("Firebase connection error:", error);
-});
+                }
+                catch (error) {
+
+                    console.error(
+                        "Session restore error:",
+                        error
+                    );
+
+                }
+
+            }
+            else {
+
+                localStorage.removeItem(
+                    "currentCustomer"
+                );
+
+                updateNavigation();
+
+            }
+
+        }
+    );
+}
 
 /* =====================================================
    LOAD CATEGORIES FROM FIRESTORE
@@ -10188,3 +10387,52 @@ async function loadCategoriesFromFirestore() {
 
     }
 }
+
+/* =====================================================
+   START WEBSITE
+===================================================== */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    async function () {
+
+        initializeStorage();
+
+        initializeManagerPermissions();
+
+       await loadCategoriesFromFirestore();
+
+       await loadSubcategoriesFromFirestore();
+
+       restoreCustomerSession();
+
+        loadCategoryFilter();
+
+        loadAdminCategories();
+
+        updateNavigation();
+
+        updateCartCount();
+
+        displayBooks();
+
+        displayCart();
+
+        updateDashboard();
+
+        showPage("home");
+    }
+);
+
+// Test connection to Firestore
+db.collection("test").add({
+    status: "Connected successfully!",
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+})
+.then((docRef) => {
+    console.log("Firebase connection successful! Test ID:", docRef.id);
+})
+.catch((error) => {
+    console.error("Firebase connection error:", error);
+});
+
