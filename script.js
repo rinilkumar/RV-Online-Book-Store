@@ -9530,7 +9530,7 @@ function displayBookOrderDetails(
    ORDER DETAILS PAGE
 ===================================================== */
 
-function displayOrderDetails() {
+async function displayOrderDetails() {
 
     const container =
         document.getElementById(
@@ -9542,8 +9542,92 @@ function displayOrderDetails() {
     }
 
 
-    const orders =
+  /* =========================================
+   LOAD ADMIN ORDERS FROM FIRESTORE
+========================================= */
+
+let orders = [];
+
+try {
+
+    const snapshot =
+        await db.collection("orders")
+            .get();
+
+
+    snapshot.forEach(
+        function (doc) {
+
+            const data =
+                doc.data();
+
+            orders.push({
+
+                ...data,
+
+                id:
+                    data.id !== undefined
+                        ? data.id
+                        : doc.id
+            });
+
+        }
+    );
+
+
+    /*
+       Sort by order ID timestamp.
+       Existing code below uses reverse(),
+       so oldest is stored first here.
+    */
+
+    orders.sort(
+        function (a, b) {
+
+            const aId =
+                Number(
+                    String(a.id)
+                        .replace(/\D/g, "")
+                ) || 0;
+
+            const bId =
+                Number(
+                    String(b.id)
+                        .replace(/\D/g, "")
+                ) || 0;
+
+            return aId - bId;
+        }
+    );
+
+
+    /* Keep local cache for old functions */
+
+    localStorage.setItem(
+        "orders",
+        JSON.stringify(orders)
+    );
+
+
+    console.log(
+        "Admin orders loaded from Firestore:",
+        orders
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading Admin orders:",
+        error
+    );
+
+
+    /* Temporary local fallback */
+
+    orders =
         getOrders();
+}
 
 
     container.innerHTML = "";
