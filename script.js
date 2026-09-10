@@ -5167,26 +5167,70 @@ ${
    ADMIN DASHBOARD COUNTS
 ===================================================== */
 
-function updateDashboard() {
+async function updateDashboard() {
+
+    /* BOOK COUNT */
 
     setText(
         "totalBooks",
         getBooks().length
     );
 
+
+    /* CUSTOMER COUNT */
+
     setText(
         "totalCustomers",
         getCustomers().length
     );
 
+
+    /* MANAGER COUNT */
+
     setText(
-        "totalOrders",
-        getOrders().length
+        "totalManagers",
+        getManagers().length
     );
-    setText(
-    "totalManagers",
-    getManagers().length
-);
+
+
+    /* =========================================
+       ORDER COUNT FROM FIRESTORE
+    ========================================= */
+
+    try {
+
+        const snapshot =
+            await db.collection("orders")
+                .get();
+
+
+        setText(
+            "totalOrders",
+            snapshot.size
+        );
+
+
+        console.log(
+            "Total Firestore orders:",
+            snapshot.size
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error loading order count:",
+            error
+        );
+
+
+        /* FALLBACK */
+
+        setText(
+            "totalOrders",
+            getOrders().length
+        );
+    }
 }
 
 
@@ -9308,7 +9352,7 @@ catch (error) {
    BOOK DETAILS
 ===================================================== */
 
-function displayBookDetails() {
+async function displayBookDetails() {
 
     const container =
         document.getElementById(
@@ -9329,8 +9373,63 @@ function displayBookDetails() {
     const books =
         getBooks();
 
-    const orders =
+   /* =========================================
+   LOAD ORDERS FROM FIRESTORE
+========================================= */
+
+let orders = [];
+
+try {
+
+    const snapshot =
+        await db.collection("orders")
+            .get();
+
+
+    snapshot.forEach(
+        function (doc) {
+
+            const data =
+                doc.data();
+
+            orders.push({
+
+                ...data,
+
+                id:
+                    data.id !== undefined
+                        ? data.id
+                        : doc.id
+            });
+
+        }
+    );
+
+
+    /* Keep local cache */
+
+    localStorage.setItem(
+        "orders",
+        JSON.stringify(orders)
+    );
+
+
+    console.log(
+        "Book purchase data loaded from Firestore:",
+        orders
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading book purchase data:",
+        error
+    );
+
+    orders =
         getOrders();
+}
 
 
     container.innerHTML = "";
@@ -9345,6 +9444,11 @@ function displayBookDetails() {
 
             orders.forEach(
                 function (order) {
+                   /* Count only confirmed purchases */
+
+if (order.status !== "Order Confirmed") {
+    return;
+}
 
                     if (
                         !Array.isArray(
