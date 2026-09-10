@@ -954,6 +954,8 @@ async function registerCustomer(event) {
 }
 
 
+
+
 /* =====================================================
    CUSTOMER LOGIN - FIREBASE AUTH
 ===================================================== */
@@ -991,7 +993,7 @@ async function customerLogin(event) {
             credential.user;
 
 
-        /* GET CUSTOMER PROFILE */
+        /* GET CUSTOMER PROFILE FROM FIRESTORE */
 
         const customerDoc =
             await db.collection("customers")
@@ -1015,7 +1017,7 @@ async function customerLogin(event) {
             customerDoc.data();
 
 
-        /* KEEP LOCAL COPY FOR EXISTING WEBSITE */
+        /* KEEP CURRENT CUSTOMER FOR EXISTING WEBSITE */
 
         localStorage.setItem(
             "currentCustomer",
@@ -1074,7 +1076,6 @@ async function customerLogin(event) {
 
     }
 }
-
 /* =====================================================
    CUSTOMER LOGOUT
 ===================================================== */
