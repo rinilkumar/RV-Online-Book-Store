@@ -5528,7 +5528,7 @@ function closeManagerPaymentVerification() {
    DISPLAY PENDING PAYMENTS - MANAGER
 ===================================================== */
 
-function displayManagerPaymentOrders() {
+async function displayManagerPaymentOrders() {
 
     const container =
         document.getElementById(
@@ -5561,8 +5561,89 @@ function displayManagerPaymentOrders() {
     }
 
 
-    const orders =
+    /* =========================================
+   LOAD ORDERS FROM FIRESTORE
+========================================= */
+
+let orders = [];
+
+try {
+
+    const snapshot =
+        await db.collection("orders")
+            .get();
+
+
+    snapshot.forEach(
+        function (doc) {
+
+            const data =
+                doc.data();
+
+            orders.push({
+
+                ...data,
+
+                id:
+                    data.id !== undefined
+                        ? data.id
+                        : doc.id
+            });
+
+        }
+    );
+
+
+    /* SORT ORDERS */
+
+    orders.sort(
+        function (a, b) {
+
+            const aId =
+                Number(
+                    String(a.id)
+                        .replace(/\D/g, "")
+                ) || 0;
+
+            const bId =
+                Number(
+                    String(b.id)
+                        .replace(/\D/g, "")
+                ) || 0;
+
+            return aId - bId;
+        }
+    );
+
+
+    /*
+       Keep the full Firestore order list locally
+       because Manager verify/reject functions
+       still use getOrders().
+    */
+
+    localStorage.setItem(
+        "orders",
+        JSON.stringify(orders)
+    );
+
+
+    console.log(
+        "Manager orders loaded from Firestore:",
+        orders
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading Manager orders:",
+        error
+    );
+
+    orders =
         getOrders();
+}
 
 
     /* =========================================
