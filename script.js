@@ -330,108 +330,264 @@ function generateManagerId() {
     );
 }
 
-function registerManager(event) {
+/* =====================================================
+   MANAGER REGISTER - FIREBASE AUTH + FIRESTORE
+===================================================== */
+
+async function registerManager(event) {
 
     event.preventDefault();
 
-    const name = document
-        .getElementById("managerRegName")
-        .value
-        .trim();
+    const name =
+        document
+            .getElementById("managerRegName")
+            .value
+            .trim();
 
-    const email = document
-        .getElementById("managerRegEmail")
-        .value
-        .trim()
-        .toLowerCase();
+    const email =
+        document
+            .getElementById("managerRegEmail")
+            .value
+            .trim()
+            .toLowerCase();
 
-    const phone = document
-        .getElementById("managerRegPhone")
-        .value
-        .trim();
+    const phone =
+        document
+            .getElementById("managerRegPhone")
+            .value
+            .trim();
 
-    const password = document
-        .getElementById("managerRegPassword")
-        .value;
-
-    let managers = getManagers();
-
-    const alreadyExists =
-        managers.some(function (manager) {
-
-            return (
-                manager.email.toLowerCase()
-                === email
-            );
-        });
+    const password =
+        document
+            .getElementById("managerRegPassword")
+            .value;
 
 
-    if (alreadyExists) {
+    if (!name || !email || !phone || !password) {
 
         alert(
-            "A Manager account already exists with this email."
+            "Please fill all Manager registration fields."
         );
 
         return;
     }
 
 
-    const manager = {
+    try {
 
-        managerId: generateManagerId(),
+        /* =========================================
+           CREATE FIREBASE AUTH ACCOUNT
+        ========================================= */
 
-        name: name,
-
-        email: email,
-
-        phone: phone,
-
-        password: password,
-
-        status: "Pending",
-
-        canVerifyPayments: false,
-
-        registeredDate:
-            new Date().toLocaleString()
-    };
+        const credential =
+            await auth
+                .createUserWithEmailAndPassword(
+                    email,
+                    password
+                );
 
 
-    managers.push(manager);
+        const user =
+            credential.user;
 
 
-    localStorage.setItem(
-        "managers",
-        JSON.stringify(managers)
-    );
+        /* =========================================
+           GENERATE MANAGER NUMBER IN FIRESTORE
+        ========================================= */
+
+        const counterRef =
+            db.collection("settings")
+                .doc("managerCounter");
 
 
-    event.target.reset();
+        const managerNumber =
+            await db.runTransaction(
+                async function (transaction) {
+
+                    const counterDoc =
+                        await transaction.get(
+                            counterRef
+                        );
 
 
-    alert(
-        "Manager registration submitted.\n\n" +
-        "Manager ID: " +
-        manager.managerId +
-        "\n\nAdmin approval is required before login."
-    );
+                    let lastNumber = 0;
 
 
-    updateDashboard();
+                    if (counterDoc.exists) {
+
+                        lastNumber =
+                            Number(
+                                counterDoc.data()
+                                    .lastNumber
+                            ) || 0;
+                    }
 
 
-    showAccountForm(
-        "managerLoginForm"
-    );
+                    const nextNumber =
+                        lastNumber + 1;
+
+
+                    transaction.set(
+                        counterRef,
+                        {
+                            lastNumber:
+                                nextNumber
+                        },
+                        {
+                            merge: true
+                        }
+                    );
+
+
+                    return nextNumber;
+                }
+            );
+
+
+        const managerId =
+            "MGR" +
+            String(managerNumber)
+                .padStart(3, "0");
+
+
+        /* =========================================
+           MANAGER PROFILE
+           DO NOT SAVE PASSWORD HERE
+        ========================================= */
+
+        const manager = {
+
+            uid:
+                user.uid,
+
+            managerId:
+                managerId,
+
+            name:
+                name,
+
+            email:
+                email,
+
+            phone:
+                phone,
+
+            status:
+                "Pending",
+
+            canVerifyPayments:
+                false,
+
+            registeredDate:
+                new Date().toLocaleString()
+        };
+
+
+        /* =========================================
+           SAVE MANAGER TO FIRESTORE
+        ========================================= */
+
+        await db.collection("managers")
+            .doc(user.uid)
+            .set(manager);
+
+
+        console.log(
+            "Manager registered in Firestore:",
+            manager
+        );
+
+
+        /*
+           createUserWithEmailAndPassword automatically
+           signs in the new account.
+
+           Manager is still Pending, so sign it out.
+        */
+
+        await auth.signOut();
+
+
+        localStorage.removeItem(
+            "currentCustomer"
+        );
+
+
+        event.target.reset();
+
+
+        updateNavigation();
+
+
+        alert(
+            "Manager registration submitted.\n\n" +
+            "Manager ID: " +
+            manager.managerId +
+            "\n\nAdmin approval is required before login."
+        );
+
+
+        showAccountForm(
+            "managerLoginForm"
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Manager registration error:",
+            error
+        );
+
+
+        if (
+            error.code ===
+            "auth/email-already-in-use"
+        ) {
+
+            alert(
+                "An account already exists with this email."
+            );
+
+        }
+        else if (
+            error.code ===
+            "auth/weak-password"
+        ) {
+
+            alert(
+                "Password must contain at least 6 characters."
+            );
+
+        }
+        else if (
+            error.code ===
+            "auth/invalid-email"
+        ) {
+
+            alert(
+                "Please enter a valid email address."
+            );
+
+        }
+        else {
+
+            alert(
+                "Manager registration failed: " +
+                error.message
+            );
+        }
+    }
 }
 
 /* =====================================================
-   MANAGER LOGIN
+   MANAGER LOGIN - FIREBASE AUTH + FIRESTORE
 ===================================================== */
 
-function managerLogin(event) {
+async function managerLogin(event) {
 
     event.preventDefault();
+
 
     const managerId =
         document
@@ -440,6 +596,7 @@ function managerLogin(event) {
             .trim()
             .toUpperCase();
 
+
     const email =
         document
             .getElementById("managerLoginEmail")
@@ -447,117 +604,251 @@ function managerLogin(event) {
             .trim()
             .toLowerCase();
 
+
     const password =
         document
             .getElementById("managerLoginPassword")
             .value;
 
 
-    const managers = getManagers();
+    if (!managerId || !email || !password) {
+
+        alert(
+            "Please enter Manager ID, email and password."
+        );
+
+        return;
+    }
 
 
-    const manager =
-        managers.find(function (item) {
+    try {
 
-            return (
-                item.managerId === managerId &&
-                item.email.toLowerCase() === email &&
-                item.password === password
+        /* =========================================
+           LOGIN WITH FIREBASE AUTH
+        ========================================= */
+
+        const credential =
+            await auth
+                .signInWithEmailAndPassword(
+                    email,
+                    password
+                );
+
+
+        const user =
+            credential.user;
+
+
+        /* =========================================
+           GET MANAGER PROFILE FROM FIRESTORE
+        ========================================= */
+
+        const managerDoc =
+            await db.collection("managers")
+                .doc(user.uid)
+                .get();
+
+
+        if (!managerDoc.exists) {
+
+            await auth.signOut();
+
+            alert(
+                "Manager profile not found."
             );
 
-        });
+            return;
+        }
 
 
-    if (!manager) {
+        const manager =
+            managerDoc.data();
 
-        alert(
-            "Invalid Manager ID, email or password."
+
+        /* =========================================
+           CHECK MANAGER ID
+        ========================================= */
+
+        if (
+            String(manager.managerId)
+                .toUpperCase() !==
+            managerId
+        ) {
+
+            await auth.signOut();
+
+            alert(
+                "Invalid Manager ID, email or password."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           CHECK ADMIN APPROVAL
+        ========================================= */
+
+        if (manager.status === "Pending") {
+
+            await auth.signOut();
+
+            alert(
+                "Your Manager account is waiting for Admin approval."
+            );
+
+            return;
+        }
+
+
+        if (manager.status === "Disabled") {
+
+            await auth.signOut();
+
+            alert(
+                "Your Manager account has been disabled by Admin."
+            );
+
+            return;
+        }
+
+
+        if (manager.status !== "Approved") {
+
+            await auth.signOut();
+
+            alert(
+                "Manager account is not approved."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           SAVE CURRENT MANAGER
+        ========================================= */
+
+        localStorage.setItem(
+            "currentManager",
+            JSON.stringify(manager)
         );
 
-        return;
-    }
 
-
-    if (manager.status === "Pending") {
-
-        alert(
-            "Your Manager account is waiting for Admin approval."
+        localStorage.setItem(
+            "managerLoggedIn",
+            "true"
         );
 
-        return;
-    }
 
+        /*
+           Remove any old customer profile
+           from this browser.
+        */
 
-    if (manager.status === "Disabled") {
-
-        alert(
-            "Your Manager account has been disabled by Admin."
+        localStorage.removeItem(
+            "currentCustomer"
         );
 
-        return;
-    }
+
+        event.target.reset();
 
 
-    if (manager.status !== "Approved") {
+        updateNavigation();
 
-        alert(
-            "Manager account is not approved."
+
+        console.log(
+            "Manager logged in:",
+            manager
         );
 
-        return;
+
+        alert(
+            "Welcome Manager " +
+            manager.name +
+            "!"
+        );
+
+
+        showPage(
+            "managerDashboard"
+        );
+
     }
+    catch (error) {
+
+        console.error(
+            "Manager login error:",
+            error
+        );
 
 
-    /* SAVE MANAGER LOGIN */
+        if (
+            error.code ===
+                "auth/invalid-credential" ||
+            error.code ===
+                "auth/wrong-password" ||
+            error.code ===
+                "auth/user-not-found"
+        ) {
 
-    localStorage.setItem(
-        "currentManager",
-        JSON.stringify(manager)
-    );
+            alert(
+                "Invalid Manager ID, email or password."
+            );
 
-    localStorage.setItem(
-        "managerLoggedIn",
-        "true"
-    );
+        }
+        else {
 
-
-    event.target.reset();
-
-
-    updateNavigation();
-
-
-    alert(
-        "Welcome Manager " +
-        manager.name +
-        "!"
-    );
-
-
-    showPage(
-        "managerDashboard"
-    );
+            alert(
+                "Manager login failed: " +
+                error.message
+            );
+        }
+    }
 }
 
-function managerLogout() {
+/* =====================================================
+   MANAGER LOGOUT - FIREBASE AUTH
+===================================================== */
 
-    localStorage.removeItem(
-        "currentManager"
-    );
+async function managerLogout() {
 
-    localStorage.removeItem(
-        "managerLoggedIn"
-    );
+    try {
 
-    updateNavigation();
+        await auth.signOut();
 
-    showPage("home");
 
-    alert(
-        "Manager logged out successfully."
-    );
+        localStorage.removeItem(
+            "currentManager"
+        );
+
+        localStorage.removeItem(
+            "managerLoggedIn"
+        );
+
+
+        updateNavigation();
+
+        showPage("home");
+
+
+        alert(
+            "Manager logged out successfully."
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Manager logout error:",
+            error
+        );
+
+        alert(
+            "Manager logout failed."
+        );
+    }
 }
-
 /* =====================================================
    PAGE NAVIGATION
 ===================================================== */
