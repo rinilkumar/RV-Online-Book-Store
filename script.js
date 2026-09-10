@@ -4507,9 +4507,12 @@ catch (error) {
     /*
        Reduce stock BEFORE clearing cart.
     */
+const stockUpdated =
+    await reducePurchasedStock(cart);
 
-    reducePurchasedStock(cart);
-
+if (!stockUpdated) {
+    return;
+}
 
     localStorage.setItem(
         "latestOrder",
@@ -4544,56 +4547,134 @@ catch (error) {
 
 
 /* =====================================================
-   REDUCE STOCK AFTER PURCHASE
+   REDUCE STOCK AFTER PURCHASE - FIRESTORE
 ===================================================== */
 
-function reducePurchasedStock(cart) {
+async function reducePurchasedStock(cart) {
 
-    let books =
-        getBooks();
+    try {
+
+        await db.runTransaction(
+            async function (transaction) {
+
+                const updates = [];
 
 
-    cart.forEach(
-        function (cartBook) {
+                /*
+                   FIRST READ ALL BOOKS
+                */
 
-            const book =
-                books.find(
+                for (const cartBook of cart) {
+
+                    const bookRef =
+                        db.collection("books")
+                            .doc(String(cartBook.id));
+
+
+                    const bookDoc =
+                        await transaction.get(bookRef);
+
+
+                    if (!bookDoc.exists) {
+
+                        throw new Error(
+                            cartBook.title +
+                            " is no longer available."
+                        );
+                    }
+
+
+                    const bookData =
+                        bookDoc.data();
+
+
+                    const currentStock =
+                        Number(bookData.stock) || 0;
+
+
+                    const quantity =
+                        Number(cartBook.quantity) || 1;
+
+
+                    if (quantity > currentStock) {
+
+                        throw new Error(
+                            "Not enough stock for " +
+                            cartBook.title +
+                            ". Available: " +
+                            currentStock
+                        );
+                    }
+
+
+                    updates.push({
+
+                        ref: bookRef,
+
+                        newStock:
+                            currentStock -
+                            quantity
+
+                    });
+                }
+
+
+                /*
+                   AFTER ALL READS,
+                   UPDATE STOCK
+                */
+
+                updates.forEach(
                     function (item) {
 
-                        return (
-                            String(item.id) ===
-                            String(cartBook.id)
+                        transaction.update(
+                            item.ref,
+                            {
+                                stock:
+                                    item.newStock
+                            }
                         );
+
                     }
                 );
 
-
-            if (!book) {
-                return;
             }
+        );
 
 
-            const quantity =
-                Number(cartBook.quantity)
-                || 1;
+        console.log(
+            "Book stock updated in Firestore."
+        );
 
 
-            book.stock =
-                Math.max(
-                    0,
-                    Number(book.stock) -
-                    quantity
-                );
-        }
-    );
+        /*
+           Reload books and refresh
+           local book cache
+        */
+
+        await displayBooks();
 
 
-    localStorage.setItem(
-        "books",
-        JSON.stringify(books)
-    );
+        return true;
+
+    }
+    catch (error) {
+
+        console.error(
+            "Stock update error:",
+            error
+        );
+
+
+        alert(
+            "Stock could not be updated.\n\n" +
+            error.message
+        );
+
+
+        return false;
+    }
 }
-
 
 /* =====================================================
    RECEIPT
@@ -5586,7 +5667,7 @@ function displayManagerPaymentOrders() {
    VERIFY PAYMENT - MANAGER
 ===================================================== */
 
-function managerVerifyPayment(orderId) {
+async function managerVerifyPayment(orderId) {
 
     /* =========================================
        MANAGER LOGIN CHECK
@@ -5840,15 +5921,17 @@ function managerVerifyPayment(orderId) {
         }
 
 
-        reducePurchasedStock(
-            freshOrder.books
-        );
+     const stockUpdated =
+    await reducePurchasedStock(
+        freshOrder.books
+    );
 
+if (!stockUpdated) {
+    return;
+}
 
-        freshOrder.stockReduced =
-            true;
-    }
-
+freshOrder.stockReduced =
+    true;
 
     /* =========================================
        VERIFY PAYMENT
@@ -9736,7 +9819,7 @@ function validateOrderStock(
 }
 
 
-function verifyOrderPayment(orderId) {
+async function verifyOrderPayment(orderId) {
 
     /* =========================================
        ADMIN LOGIN CHECK
@@ -9928,14 +10011,17 @@ function verifyOrderPayment(orderId) {
         }
 
 
-        reducePurchasedStock(
-            order.books
-        );
+       const stockUpdated =
+    await reducePurchasedStock(
+        order.books
+    );
 
+if (!stockUpdated) {
+    return;
+}
 
-        order.stockReduced =
-            true;
-    }
+order.stockReduced =
+    true;
 
 
     /* =========================================
