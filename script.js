@@ -4827,7 +4827,7 @@ function downloadReceipt() {
    PURCHASE HISTORY
 ===================================================== */
 
-function displayPurchaseHistory() {
+async function displayPurchaseHistory() {
 
     const customer =
         getCurrentCustomer();
@@ -4865,23 +4865,108 @@ function displayPurchaseHistory() {
         return;
     }
 
+/* =========================================
+   LOAD CUSTOMER ORDERS FROM FIRESTORE
+========================================= */
+
+let customerOrders = [];
+
+try {
+
+    const snapshot =
+        await db.collection("orders")
+            .where(
+                "customerId",
+                "==",
+                String(customer.id)
+            )
+            .get();
+
+
+    snapshot.forEach(
+        function (doc) {
+
+            const data =
+                doc.data();
+
+
+            customerOrders.push({
+
+                ...data,
+
+                id:
+                    data.id !== undefined
+                        ? data.id
+                        : doc.id
+
+            });
+
+        }
+    );
+
+
+    /*
+       Sort using BH timestamp ID.
+       Oldest first because your existing
+       code below uses .reverse().
+    */
+
+    customerOrders.sort(
+        function (a, b) {
+
+            const aId =
+                Number(
+                    String(a.id)
+                        .replace(/\D/g, "")
+                ) || 0;
+
+            const bId =
+                Number(
+                    String(b.id)
+                        .replace(/\D/g, "")
+                ) || 0;
+
+
+            return aId - bId;
+        }
+    );
+
+
+    console.log(
+        "Customer orders loaded from Firestore:",
+        customerOrders
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading purchase history:",
+        error
+    );
+
+
+    /*
+       Temporary fallback to old local orders
+       if Firestore cannot be reached.
+    */
 
     const orders =
         getOrders();
 
 
-    const customerOrders =
+    customerOrders =
         orders.filter(
             function (order) {
 
                 return (
-                    String(order.email)
-                        .toLowerCase() ===
-                    String(customer.email)
-                        .toLowerCase()
+                    String(order.customerId) ===
+                    String(customer.id)
                 );
+
             }
         );
+}
 
 
     if (countElement) {
@@ -5964,6 +6049,39 @@ freshOrder.stockReduced =
     freshOrder.paymentVerifiedByManagerName =
         manager.name;
 
+       /* =========================================
+   SAVE VERIFIED ORDER TO FIRESTORE
+========================================= */
+
+try {
+
+    await db.collection("orders")
+        .doc(String(freshOrder.id))
+        .set(
+            freshOrder,
+            { merge: true }
+        );
+
+    console.log(
+        "Manager verification saved to Firestore:",
+        freshOrder.id
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error saving payment verification:",
+        error
+    );
+
+    alert(
+        "Payment verification could not be saved online."
+    );
+
+    return;
+}
+
 
     /* =========================================
        SAVE ORDERS
@@ -6062,7 +6180,7 @@ freshOrder.stockReduced =
    REJECT PAYMENT - MANAGER
 ===================================================== */
 
-function managerRejectPayment(orderId) {
+async function managerRejectPayment(orderId) {
 
     /* =========================================
        MANAGER LOGIN CHECK
@@ -6333,6 +6451,38 @@ function managerRejectPayment(orderId) {
     freshOrder.paymentRejectedByManagerName =
         manager.name;
 
+   /* =========================================
+   SAVE REJECTED ORDER TO FIRESTORE
+========================================= */
+
+try {
+
+    await db.collection("orders")
+        .doc(String(freshOrder.id))
+        .set(
+            freshOrder,
+            { merge: true }
+        );
+
+    console.log(
+        "Manager rejection saved to Firestore:",
+        freshOrder.id
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error saving payment rejection:",
+        error
+    );
+
+    alert(
+        "Payment rejection could not be saved online."
+    );
+
+    return;
+}
 
     /* =========================================
        SAVE ORDERS
@@ -10047,6 +10197,39 @@ order.stockReduced =
     order.paymentVerifiedByRole =
         "Admin";
 
+       /* =========================================
+   SAVE ADMIN VERIFICATION TO FIRESTORE
+========================================= */
+
+try {
+
+    await db.collection("orders")
+        .doc(String(order.id))
+        .set(
+            order,
+            { merge: true }
+        );
+
+    console.log(
+        "Admin verification saved to Firestore:",
+        order.id
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error saving Admin verification:",
+        error
+    );
+
+    alert(
+        "Payment verification could not be saved online."
+    );
+
+    return;
+}
+
 
     /* =========================================
        SAVE ORDERS
@@ -10126,7 +10309,7 @@ order.stockReduced =
     );
 }
 
-function rejectOrderPayment(orderId) {
+async function rejectOrderPayment(orderId) {
 
     /* =========================================
        ADMIN LOGIN CHECK
@@ -10318,6 +10501,39 @@ function rejectOrderPayment(orderId) {
 
     order.paymentRejectedByRole =
         "Admin";
+
+   /* =========================================
+   SAVE ADMIN REJECTION TO FIRESTORE
+========================================= */
+
+try {
+
+    await db.collection("orders")
+        .doc(String(order.id))
+        .set(
+            order,
+            { merge: true }
+        );
+
+    console.log(
+        "Admin rejection saved to Firestore:",
+        order.id
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error saving Admin rejection:",
+        error
+    );
+
+    alert(
+        "Payment rejection could not be saved online."
+    );
+
+    return;
+}
 
 
     /* =========================================
