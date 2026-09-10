@@ -4068,7 +4068,9 @@ function copyAdminUpiId() {
 
         });
 }
-
+//==========================================
+// Confirm Online Payment
+//===========================================
 async function confirmOnlinePayment() {
 
     const customer =
@@ -10868,4 +10870,3 @@ db.collection("test").add({
 .catch((error) => {
     console.error("Firebase connection error:", error);
 });
-
