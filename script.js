@@ -1077,22 +1077,31 @@ async function customerLogin(event) {
     }
 }
 /* =====================================================
-   CUSTOMER LOGOUT
+   CUSTOMER LOGOUT - FIREBASE AUTH
 ===================================================== */
 
 async function customerLogout() {
 
     try {
 
+        /* SIGN OUT FROM FIREBASE */
+
         await auth.signOut();
+
+
+        /* REMOVE LOCAL CUSTOMER COPY */
 
         localStorage.removeItem(
             "currentCustomer"
         );
 
+
+        /* UPDATE WEBSITE */
+
         updateNavigation();
 
         showPage("home");
+
 
         alert(
             "Customer logged out successfully."
@@ -1102,7 +1111,7 @@ async function customerLogout() {
     catch (error) {
 
         console.error(
-            "Logout error:",
+            "Customer logout error:",
             error
         );
 
