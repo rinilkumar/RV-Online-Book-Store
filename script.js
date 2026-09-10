@@ -6019,7 +6019,7 @@ if (!stockUpdated) {
 
 freshOrder.stockReduced =
     true;
-
+    }
     /* =========================================
        VERIFY PAYMENT
     ========================================= */
@@ -10171,10 +10171,11 @@ async function verifyOrderPayment(orderId) {
 if (!stockUpdated) {
     return;
 }
+      
 
 order.stockReduced =
     true;
-
+    }
 
     /* =========================================
        VERIFY PAYMENT
