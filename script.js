@@ -2209,6 +2209,211 @@ function isAdminLoggedIn() {
 }
 
 /* =====================================================
+   RESTORE ADMIN FIREBASE SESSION
+===================================================== */
+
+function restoreAdminSession() {
+
+    auth.onAuthStateChanged(
+        async function (user) {
+
+            /* =========================================
+               NO FIREBASE USER
+            ========================================= */
+
+            if (!user) {
+
+                localStorage.removeItem(
+                    "adminLoggedIn"
+                );
+
+                localStorage.removeItem(
+                    "currentAdmin"
+                );
+
+                updateNavigation();
+
+                return;
+            }
+
+
+            /*
+               Only try to restore Admin mode
+               when this browser previously had
+               an Admin session.
+            */
+
+            const savedAdmin =
+                getCurrentAdmin();
+
+
+            const savedAdminLogin =
+                localStorage.getItem(
+                    "adminLoggedIn"
+                ) === "true";
+
+
+            if (
+                !savedAdmin ||
+                !savedAdminLogin
+            ) {
+
+                return;
+            }
+
+
+            /* =========================================
+               CHECK SAVED UID
+            ========================================= */
+
+            if (
+                savedAdmin.uid !==
+                user.uid
+            ) {
+
+                localStorage.removeItem(
+                    "adminLoggedIn"
+                );
+
+                localStorage.removeItem(
+                    "currentAdmin"
+                );
+
+                updateNavigation();
+
+                return;
+            }
+
+
+            try {
+
+                /* =====================================
+                   LOAD ADMIN PROFILE FROM FIRESTORE
+                ===================================== */
+
+                const adminDoc =
+                    await db.collection(
+                        "admins"
+                    )
+                    .doc(user.uid)
+                    .get();
+
+
+                /* ADMIN DOCUMENT REMOVED */
+
+                if (!adminDoc.exists) {
+
+                    localStorage.removeItem(
+                        "adminLoggedIn"
+                    );
+
+                    localStorage.removeItem(
+                        "currentAdmin"
+                    );
+
+
+                    updateNavigation();
+
+
+                    console.warn(
+                        "Admin profile not found."
+                    );
+
+                    return;
+                }
+
+
+                const admin =
+                    adminDoc.data();
+
+
+                /* =====================================
+                   VERIFY ADMIN ROLE
+                ===================================== */
+
+                if (
+                    admin.role !== "admin" ||
+                    admin.active !== true
+                ) {
+
+                    localStorage.removeItem(
+                        "adminLoggedIn"
+                    );
+
+                    localStorage.removeItem(
+                        "currentAdmin"
+                    );
+
+
+                    updateNavigation();
+
+
+                    console.warn(
+                        "Admin access is not active."
+                    );
+
+                    return;
+                }
+
+
+                /* =====================================
+                   RESTORE VALID ADMIN SESSION
+                ===================================== */
+
+                const currentAdmin = {
+
+                    uid:
+                        user.uid,
+
+                    name:
+                        admin.name || "Admin",
+
+                    email:
+                        user.email,
+
+                    role:
+                        "admin",
+
+                    active:
+                        true
+                };
+
+
+                localStorage.setItem(
+                    "currentAdmin",
+                    JSON.stringify(
+                        currentAdmin
+                    )
+                );
+
+
+                localStorage.setItem(
+                    "adminLoggedIn",
+                    "true"
+                );
+
+
+                console.log(
+                    "Admin session restored:",
+                    currentAdmin.email
+                );
+
+
+                updateNavigation();
+
+            }
+            catch (error) {
+
+                console.error(
+                    "Admin session restore error:",
+                    error
+                );
+            }
+        }
+    );
+}
+
+/* =====================================================
    ADMIN LOGOUT - FIREBASE
 ===================================================== */
 
@@ -12421,6 +12626,8 @@ document.addEventListener(
        restoreCustomerSession();
 
        restoreManagerSession();
+
+       restoreAdminSession();
 
         loadCategoryFilter();
 
