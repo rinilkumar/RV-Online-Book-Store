@@ -1873,56 +1873,291 @@ function updateNavigation() {
 }
 
 /* =====================================================
-   ADMIN LOGIN
+   ADMIN LOGIN - FIREBASE AUTHENTICATION
 ===================================================== */
 
-/*
-   Enter your own Admin password below.
-   Do not share a real password publicly.
-*/
-
-const ADMIN_USERNAME = "Varshini.R";
-
-const ADMIN_PASSWORD =
-    "Varshini7112007";
-
-
-function adminLogin(event) {
+async function adminLogin(event) {
 
     event.preventDefault();
 
-    const username = document
-        .getElementById("adminUsername")
-        .value
-        .trim();
 
-    const password = document
-        .getElementById("adminPassword")
-        .value;
+    /* =========================================
+       GET LOGIN DETAILS
+    ========================================= */
+
+    /*
+       We keep the existing HTML ID
+       "adminUsername" for now.
+
+       The field will now contain the
+       Admin EMAIL address.
+    */
+
+    const email =
+        document
+            .getElementById(
+                "adminUsername"
+            )
+            .value
+            .trim()
+            .toLowerCase();
+
+
+    const password =
+        document
+            .getElementById(
+                "adminPassword"
+            )
+            .value;
 
 
     if (
-        username === ADMIN_USERNAME &&
-        password === ADMIN_PASSWORD
+        !email ||
+        !password
     ) {
 
-        // Keep Admin logged in until Admin Logout is clicked
+        alert(
+            "Please enter Admin email and password."
+        );
+
+        return;
+    }
+
+
+    try {
+
+        /* =========================================
+           FIREBASE AUTHENTICATION
+        ========================================= */
+
+        const credential =
+            await auth
+                .signInWithEmailAndPassword(
+                    email,
+                    password
+                );
+
+
+        const user =
+            credential.user;
+
+
+        /* =========================================
+           CHECK ADMIN ROLE IN FIRESTORE
+        ========================================= */
+
+        const adminDoc =
+            await db.collection("admins")
+                .doc(user.uid)
+                .get();
+
+
+        /* USER IS NOT REGISTERED AS ADMIN */
+
+        if (!adminDoc.exists) {
+
+            await auth.signOut();
+
+            localStorage.removeItem(
+                "adminLoggedIn"
+            );
+
+            localStorage.removeItem(
+                "currentAdmin"
+            );
+
+
+            alert(
+                "This account does not have Admin permission."
+            );
+
+            return;
+        }
+
+
+        const admin =
+            adminDoc.data();
+
+
+        /* =========================================
+           VERIFY ADMIN ROLE
+        ========================================= */
+
+        if (
+            admin.role !== "admin" ||
+            admin.active !== true
+        ) {
+
+            await auth.signOut();
+
+            localStorage.removeItem(
+                "adminLoggedIn"
+            );
+
+            localStorage.removeItem(
+                "currentAdmin"
+            );
+
+
+            alert(
+                "Admin access is not active."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           VALID ADMIN
+        ========================================= */
+
+        const currentAdmin = {
+
+            uid:
+                user.uid,
+
+            name:
+                admin.name || "Admin",
+
+            email:
+                user.email,
+
+            role:
+                "admin",
+
+            active:
+                true
+        };
+
+
+        localStorage.setItem(
+            "currentAdmin",
+            JSON.stringify(
+                currentAdmin
+            )
+        );
+
+
         localStorage.setItem(
             "adminLoggedIn",
             "true"
         );
 
+
+        /* =========================================
+           CLEAR OTHER ACCOUNT TYPES
+        ========================================= */
+
+        localStorage.removeItem(
+            "currentCustomer"
+        );
+
+        localStorage.removeItem(
+            "currentManager"
+        );
+
+        localStorage.removeItem(
+            "managerLoggedIn"
+        );
+
+
+        /*
+           Stop an old Manager Firestore listener
+           if one exists in this browser.
+        */
+
+        if (
+            typeof managerProfileUnsubscribe !==
+                "undefined" &&
+            managerProfileUnsubscribe
+        ) {
+
+            managerProfileUnsubscribe();
+
+            managerProfileUnsubscribe =
+                null;
+        }
+
+
+        /* =========================================
+           FINISH LOGIN
+        ========================================= */
+
         event.target.reset();
+
 
         updateNavigation();
 
-        alert("Admin login successful.");
 
-        showPage("admin");
+        console.log(
+            "Firebase Admin login successful:",
+            currentAdmin.email
+        );
 
-    } else {
 
-        alert("Invalid Admin username or password.");
+        alert(
+            "Admin login successful."
+        );
+
+
+        showPage(
+            "admin"
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Admin login error:",
+            error
+        );
+
+
+        localStorage.removeItem(
+            "adminLoggedIn"
+        );
+
+        localStorage.removeItem(
+            "currentAdmin"
+        );
+
+
+        alert(
+            "Invalid Admin email or password."
+        );
+    }
+}
+
+/* =====================================================
+   GET CURRENT ADMIN
+===================================================== */
+
+function getCurrentAdmin() {
+
+    const data =
+        localStorage.getItem(
+            "currentAdmin"
+        );
+
+
+    if (!data) {
+        return null;
+    }
+
+
+    try {
+
+        return JSON.parse(data);
+
+    }
+    catch (error) {
+
+        console.error(
+            "Current Admin data error:",
+            error
+        );
+
+        return null;
     }
 }
 
@@ -1933,28 +2168,87 @@ function adminLogin(event) {
 
 function isAdminLoggedIn() {
 
+    const currentAdmin =
+        getCurrentAdmin();
+
+
+    const user =
+        auth.currentUser;
+
+
+    if (
+        !user ||
+        !currentAdmin
+    ) {
+
+        return false;
+    }
+
+
     return (
+
         localStorage.getItem(
             "adminLoggedIn"
         ) === "true"
+
+        &&
+
+        currentAdmin.uid ===
+            user.uid
+
+        &&
+
+        currentAdmin.role ===
+            "admin"
+
+        &&
+
+        currentAdmin.active ===
+            true
     );
 }
 
-
 /* =====================================================
-   ADMIN LOGOUT
+   ADMIN LOGOUT - FIREBASE
 ===================================================== */
 
-function adminLogout() {
+async function adminLogout() {
 
-    // This is the ONLY place Admin login is removed
-    localStorage.removeItem("adminLoggedIn");
+    try {
+
+        await auth.signOut();
+
+    }
+    catch (error) {
+
+        console.error(
+            "Admin logout error:",
+            error
+        );
+    }
+
+
+    localStorage.removeItem(
+        "adminLoggedIn"
+    );
+
+
+    localStorage.removeItem(
+        "currentAdmin"
+    );
+
 
     updateNavigation();
 
-    showPage("home");
 
-    alert("Admin logged out successfully.");
+    showPage(
+        "home"
+    );
+
+
+    alert(
+        "Admin logged out successfully."
+    );
 }
 
 
