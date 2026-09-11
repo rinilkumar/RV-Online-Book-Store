@@ -629,19 +629,22 @@ function generateManagerId() {
     );
 }
 
+
 /* =====================================================
-   MANAGER REGISTER - FIREBASE AUTH + FIRESTORE
+   REGISTER MANAGER - FIREBASE + SECURE COUNTER
 ===================================================== */
 
 async function registerManager(event) {
 
     event.preventDefault();
 
+
     const name =
         document
             .getElementById("managerRegName")
             .value
             .trim();
+
 
     const email =
         document
@@ -650,11 +653,13 @@ async function registerManager(event) {
             .trim()
             .toLowerCase();
 
+
     const phone =
         document
             .getElementById("managerRegPhone")
             .value
             .trim();
+
 
     const password =
         document
@@ -662,7 +667,12 @@ async function registerManager(event) {
             .value;
 
 
-    if (!name || !email || !phone || !password) {
+    if (
+        !name ||
+        !email ||
+        !phone ||
+        !password
+    ) {
 
         alert(
             "Please fill all Manager registration fields."
@@ -690,122 +700,140 @@ async function registerManager(event) {
             credential.user;
 
 
-        /* =========================================
-           GENERATE MANAGER NUMBER IN FIRESTORE
-        ========================================= */
-
         const counterRef =
             db.collection("settings")
                 .doc("managerCounter");
 
 
-        const managerNumber =
-            await db.runTransaction(
-                async function (transaction) {
-
-                    const counterDoc =
-                        await transaction.get(
-                            counterRef
-                        );
+        const managerRef =
+            db.collection("managers")
+                .doc(user.uid);
 
 
-                    let lastNumber = 0;
+        let createdManager =
+            null;
 
 
-                    if (counterDoc.exists) {
+        /* =========================================
+           COUNTER + MANAGER PROFILE
+           ONE ATOMIC TRANSACTION
+        ========================================= */
 
-                        lastNumber =
-                            Number(
-                                counterDoc.data()
-                                    .lastNumber
-                            ) || 0;
-                    }
+        await db.runTransaction(
+            async function (transaction) {
 
-
-                    const nextNumber =
-                        lastNumber + 1;
-
-
-                    transaction.set(
-                        counterRef,
-                        {
-                            lastNumber:
-                                nextNumber
-                        },
-                        {
-                            merge: true
-                        }
+                const counterDoc =
+                    await transaction.get(
+                        counterRef
                     );
 
 
-                    return nextNumber;
+                if (!counterDoc.exists) {
+
+                    throw new Error(
+                        "Manager counter was not found."
+                    );
                 }
-            );
 
 
-        const managerId =
-            "MGR" +
-            String(managerNumber)
-                .padStart(3, "0");
+                const currentNumber =
+                    Number(
+                        counterDoc.data()
+                            .lastNumber
+                    ) || 0;
 
 
-        /* =========================================
-           MANAGER PROFILE
-           DO NOT SAVE PASSWORD HERE
-        ========================================= */
-
-        const manager = {
-
-            uid:
-                user.uid,
-
-            managerId:
-                managerId,
-
-            name:
-                name,
-
-            email:
-                email,
-
-            phone:
-                phone,
-
-            status:
-                "Pending",
-
-            canVerifyPayments:
-                false,
-
-            registeredDate:
-                new Date().toLocaleString()
-        };
+                const nextNumber =
+                    currentNumber + 1;
 
 
-        /* =========================================
-           SAVE MANAGER TO FIRESTORE
-        ========================================= */
+                const managerId =
+                    "MGR" +
+                    String(nextNumber)
+                        .padStart(
+                            3,
+                            "0"
+                        );
 
-        await db.collection("managers")
-            .doc(user.uid)
-            .set(manager);
+
+                createdManager = {
+
+                    uid:
+                        user.uid,
+
+                    managerId:
+                        managerId,
+
+                    managerNumber:
+                        nextNumber,
+
+                    name:
+                        name,
+
+                    email:
+                        email,
+
+                    phone:
+                        phone,
+
+                    status:
+                        "Pending",
+
+                    canVerifyPayments:
+                        false,
+
+                    registeredDate:
+                        new Date()
+                            .toLocaleString()
+
+                };
+
+
+                /* UPDATE COUNTER */
+
+                transaction.update(
+                    counterRef,
+                    {
+                        lastNumber:
+                            nextNumber
+                    }
+                );
+
+
+                /* CREATE MANAGER PROFILE */
+
+                transaction.set(
+                    managerRef,
+                    createdManager
+                );
+            }
+        );
 
 
         console.log(
-            "Manager registered in Firestore:",
-            manager
+            "Manager registered securely:",
+            createdManager
         );
 
 
         /*
-           createUserWithEmailAndPassword automatically
-           signs in the new account.
+           createUserWithEmailAndPassword()
+           automatically logs in the new Manager.
 
-           Manager is still Pending, so sign it out.
+           Registration must finish logged out
+           until Admin approves the account.
         */
 
         await auth.signOut();
 
+
+        localStorage.removeItem(
+            "currentManager"
+        );
+
+        localStorage.removeItem(
+            "managerLoggedIn"
+        );
 
         localStorage.removeItem(
             "currentCustomer"
@@ -819,10 +847,15 @@ async function registerManager(event) {
 
 
         alert(
-            "Manager registration submitted.\n\n" +
+            "Manager registration successful.\n\n" +
             "Manager ID: " +
-            manager.managerId +
-            "\n\nAdmin approval is required before login."
+            createdManager.managerId +
+            "\n\nWaiting for Admin approval."
+        );
+
+
+        showPage(
+            "accountPage"
         );
 
 
@@ -839,13 +872,33 @@ async function registerManager(event) {
         );
 
 
+        /*
+           If Firebase Authentication was created
+           but Firestore registration failed,
+           make sure the browser is not left logged in.
+        */
+
+        try {
+
+            await auth.signOut();
+
+        }
+        catch (logoutError) {
+
+            console.error(
+                "Registration cleanup error:",
+                logoutError
+            );
+        }
+
+
         if (
             error.code ===
             "auth/email-already-in-use"
         ) {
 
             alert(
-                "An account already exists with this email."
+                "This email is already registered."
             );
 
         }
@@ -859,20 +912,10 @@ async function registerManager(event) {
             );
 
         }
-        else if (
-            error.code ===
-            "auth/invalid-email"
-        ) {
-
-            alert(
-                "Please enter a valid email address."
-            );
-
-        }
         else {
 
             alert(
-                "Manager registration failed: " +
+                "Manager registration could not be completed.\n\n" +
                 error.message
             );
         }
@@ -5553,12 +5596,15 @@ async function processPayment() {
         paymentMethod:
             payment.value,
 
-        status:
-            "Order Confirmed",
+       status:
+    "Awaiting Admin Confirmation",
 
-        date:
-            new Date()
-                .toLocaleString()
+stockReduced:
+    false,
+
+date:
+    new Date()
+        .toLocaleString()
     };
 
 let orders =
@@ -5605,15 +5651,7 @@ catch (error) {
     return;
 }
 
-    /*
-       Reduce stock BEFORE clearing cart.
-    */
-const stockUpdated =
-    await reducePurchasedStock(cart);
 
-if (!stockUpdated) {
-    return;
-}
 
     localStorage.setItem(
         "latestOrder",
@@ -5638,9 +5676,10 @@ if (!stockUpdated) {
     generateReceipt(order);
 
 
-    alert(
-        "Order placed successfully!"
-    );
+   alert(
+    "Order placed successfully!\n\n" +
+    "Your Cash on Delivery order is waiting for Admin confirmation."
+);
 
 
     showPage("receipt");
@@ -10090,86 +10129,166 @@ function updateCurrentManagerPermission(
 
 
 /* =====================================================
-   APPROVE MANAGER - ADMIN
+   APPROVE MANAGER - FIRESTORE
 ===================================================== */
 
-function approveManager(managerId) {
+async function approveManager(managerId) {
 
-    // Only Admin can approve Managers
+    /* =========================================
+       ADMIN CHECK
+    ========================================= */
+
     if (!isAdminLoggedIn()) {
 
-        alert("Admin permission required.");
-
-        showPage("accountPage");
-
-        showAccountForm("adminLoginForm");
-
-        return;
-    }
-
-
-    // Get all Managers
-    let managers = getManagers();
-
-
-    // Find Manager using Manager ID
-    const manager =
-        managers.find(function (item) {
-
-            return (
-                item.managerId === managerId
-            );
-
-        });
-
-
-    // Stop if Manager does not exist
-    if (!manager) {
-
-        alert("Manager not found.");
-
-        return;
-    }
-
-
-    // Check if already approved
-    if (manager.status === "Approved") {
-
         alert(
-            "This Manager is already approved."
+            "Admin permission required."
+        );
+
+        showPage(
+            "accountPage"
+        );
+
+        showAccountForm(
+            "adminLoginForm"
         );
 
         return;
     }
 
 
-    // Change Pending -> Approved
-    manager.status = "Approved";
+    try {
+
+        /* =========================================
+           FIND MANAGER IN FIRESTORE
+        ========================================= */
+
+        const snapshot =
+            await db.collection("managers")
+                .where(
+                    "managerId",
+                    "==",
+                    managerId
+                )
+                .limit(1)
+                .get();
 
 
-    // Save updated Manager list
-    localStorage.setItem(
-        "managers",
-        JSON.stringify(managers)
-    );
+        if (snapshot.empty) {
+
+            alert(
+                "Manager not found in Firestore."
+            );
+
+            return;
+        }
 
 
-    // Refresh Manager Management page
-    displayManagers();
+        const managerDoc =
+            snapshot.docs[0];
+
+        const manager =
+            managerDoc.data();
 
 
-    // Refresh Admin Dashboard counts
-    updateDashboard();
+        /* =========================================
+           ALREADY APPROVED
+        ========================================= */
+
+        if (
+            manager.status ===
+            "Approved"
+        ) {
+
+            alert(
+                "This Manager is already approved."
+            );
+
+            await displayManagers();
+
+            return;
+        }
 
 
-    alert(
-        "Manager approved successfully.\n\n" +
-        "Manager ID: " +
-        manager.managerId +
-        "\n" +
-        "Manager Name: " +
-        manager.name
-    );
+        /* =========================================
+           CONFIRM
+        ========================================= */
+
+        const confirmed =
+            confirm(
+                "Approve this Manager?\n\n" +
+
+                "Manager ID: " +
+                manager.managerId +
+
+                "\nManager Name: " +
+                manager.name
+            );
+
+
+        if (!confirmed) {
+            return;
+        }
+
+
+        /* =========================================
+           UPDATE FIRESTORE
+        ========================================= */
+
+        await db.collection("managers")
+            .doc(managerDoc.id)
+            .update({
+
+                status:
+                    "Approved",
+
+                approvedDate:
+                    new Date()
+                        .toLocaleString()
+
+            });
+
+
+        console.log(
+            "Manager approved in Firestore:",
+            manager.managerId
+        );
+
+
+        /* =========================================
+           IMPORTANT:
+           RELOAD FROM FIRESTORE
+        ========================================= */
+
+        await displayManagers();
+
+
+        await updateDashboard();
+
+
+        alert(
+            "Manager approved successfully.\n\n" +
+
+            "Manager ID: " +
+            manager.managerId +
+
+            "\nManager Name: " +
+            manager.name
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Manager approval error:",
+            error
+        );
+
+
+        alert(
+            "Manager could not be approved.\n\n" +
+            error.message
+        );
+    }
 }
 /* =====================================================
    EDIT MANAGER - FIRESTORE
@@ -11559,7 +11678,33 @@ catch (error) {
 
 ${
     order.paymentMethod === "UPI"
+        ?
+   ${
+    order.paymentMethod ===
+        "Cash on Delivery" &&
+
+    order.stockReduced !== true &&
+
+    order.status ===
+        "Awaiting Admin Confirmation"
+
         ? `
+            <div class="payment-verification-buttons">
+
+                <button
+                    type="button"
+                    class="verify-payment-btn"
+                    onclick="confirmCODOrder('${order.id}')"
+                >
+                    ✓ Confirm COD Order
+                </button>
+
+            </div>
+        `
+
+        : ""
+}
+`
 <div class="admin-payment-info">
 
     <p>
@@ -11876,6 +12021,265 @@ function validateOrderStock(
 
     return true;
 }
+
+
+
+/* =====================================================
+   CONFIRM CASH ON DELIVERY ORDER - ADMIN
+===================================================== */
+
+async function confirmCODOrder(orderId) {
+
+    /* =========================================
+       ADMIN CHECK
+    ========================================= */
+
+    if (!isAdminLoggedIn()) {
+
+        alert(
+            "Admin permission required."
+        );
+
+        showPage(
+            "accountPage"
+        );
+
+        showAccountForm(
+            "adminLoginForm"
+        );
+
+        return;
+    }
+
+
+    try {
+
+        /* =========================================
+           LOAD FRESH ORDER FROM FIRESTORE
+        ========================================= */
+
+        const orderRef =
+            db.collection("orders")
+                .doc(String(orderId));
+
+
+        const orderDoc =
+            await orderRef.get();
+
+
+        if (!orderDoc.exists) {
+
+            alert(
+                "Order not found."
+            );
+
+            return;
+        }
+
+
+        const order = {
+
+            ...orderDoc.data(),
+
+            id:
+                orderDoc.data().id ||
+                orderDoc.id
+
+        };
+
+
+        /* =========================================
+           CHECK PAYMENT METHOD
+        ========================================= */
+
+        if (
+            order.paymentMethod !==
+            "Cash on Delivery"
+        ) {
+
+            alert(
+                "This is not a Cash on Delivery order."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           CHECK ALREADY CONFIRMED
+        ========================================= */
+
+        if (
+            order.stockReduced === true ||
+            order.status ===
+                "Order Confirmed"
+        ) {
+
+            alert(
+                "This order has already been confirmed."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           ADMIN CONFIRMATION
+        ========================================= */
+
+        const confirmed =
+            confirm(
+
+                "Confirm this Cash on Delivery order?\n\n" +
+
+                "Order: " +
+                order.id +
+
+                "\nCustomer: " +
+                order.customer +
+
+                "\nAmount: ₹" +
+                order.total
+
+            );
+
+
+        if (!confirmed) {
+            return;
+        }
+
+
+        /* =========================================
+           REDUCE STOCK
+        ========================================= */
+
+        const stockUpdated =
+            await reducePurchasedStock(
+                order.books
+            );
+
+
+        if (!stockUpdated) {
+
+            return;
+        }
+
+
+        /* =========================================
+           UPDATE ORDER
+        ========================================= */
+
+        await orderRef.set(
+            {
+
+                stockReduced:
+                    true,
+
+                status:
+                    "Order Confirmed",
+
+                codConfirmedDate:
+                    new Date()
+                        .toLocaleString(),
+
+                codConfirmedByRole:
+                    "Admin"
+
+            },
+
+            {
+                merge:
+                    true
+            }
+        );
+
+
+        console.log(
+            "COD order confirmed:",
+            order.id
+        );
+
+
+        /* =========================================
+           UPDATE LOCAL ORDER CACHE
+        ========================================= */
+
+        let orders =
+            getOrders();
+
+
+        const index =
+            orders.findIndex(
+                function (item) {
+
+                    return (
+                        String(item.id) ===
+                        String(orderId)
+                    );
+                }
+            );
+
+
+        if (index >= 0) {
+
+            orders[index].stockReduced =
+                true;
+
+            orders[index].status =
+                "Order Confirmed";
+
+            orders[index].codConfirmedDate =
+                new Date()
+                    .toLocaleString();
+
+            orders[index].codConfirmedByRole =
+                "Admin";
+
+
+            localStorage.setItem(
+                "orders",
+                JSON.stringify(
+                    orders
+                )
+            );
+        }
+
+
+        /* =========================================
+           REFRESH
+        ========================================= */
+
+        await displayOrderDetails();
+
+        displayPurchaseHistory();
+
+        displayBooks();
+
+        displayBookDetails();
+
+        updateDashboard();
+
+
+        alert(
+            "Cash on Delivery order confirmed successfully."
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "COD confirmation error:",
+            error
+        );
+
+
+        alert(
+            "COD order could not be confirmed.\n\n" +
+            error.message
+        );
+    }
+}
+
 
 
 async function verifyOrderPayment(orderId) {
