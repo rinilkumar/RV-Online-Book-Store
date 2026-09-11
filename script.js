@@ -4708,62 +4708,124 @@ function removeFromCart(index) {
 
 
 /* =====================================================
-   VALIDATE CART STOCK
+   VALIDATE CART STOCK - FIRESTORE
 ===================================================== */
 
-function validateCartStock() {
+async function validateCartStock() {
 
     const cart =
         getCart();
 
-    const books =
-        getBooks();
 
+    if (cart.length === 0) {
 
-    for (const cartBook of cart) {
-
-        const book =
-            books.find(
-                function (item) {
-
-                    return (
-                        String(item.id) ===
-                        String(cartBook.id)
-                    );
-                }
-            );
-
-
-        if (!book) {
-
-            alert(
-                cartBook.title +
-                " is no longer available."
-            );
-
-            return false;
-        }
-
-
-        if (
-            Number(cartBook.quantity) >
-            Number(book.stock)
-        ) {
-
-            alert(
-                "Only " +
-                book.stock +
-                " copies of " +
-                book.title +
-                " are available."
-            );
-
-            return false;
-        }
+        return false;
     }
 
 
-    return true;
+    try {
+
+        for (const cartBook of cart) {
+
+            /* =========================================
+               GET LATEST BOOK FROM FIRESTORE
+            ========================================= */
+
+            const bookDoc =
+                await db.collection("books")
+                    .doc(
+                        String(
+                            cartBook.id
+                        )
+                    )
+                    .get();
+
+
+            if (!bookDoc.exists) {
+
+                alert(
+                    cartBook.title +
+                    " is no longer available."
+                );
+
+                return false;
+            }
+
+
+            const book =
+                bookDoc.data();
+
+
+            const currentStock =
+                Number(book.stock) || 0;
+
+
+            const quantity =
+                Number(
+                    cartBook.quantity
+                ) || 1;
+
+
+            /* =========================================
+               VALIDATE QUANTITY
+            ========================================= */
+
+            if (
+                !Number.isInteger(quantity) ||
+                quantity <= 0
+            ) {
+
+                alert(
+                    "Invalid quantity for " +
+                    (book.title || cartBook.title)
+                );
+
+                return false;
+            }
+
+
+            /* =========================================
+               CHECK LATEST STOCK
+            ========================================= */
+
+            if (
+                quantity >
+                currentStock
+            ) {
+
+                alert(
+                    "Only " +
+                    currentStock +
+                    " copies of " +
+                    (book.title || cartBook.title) +
+                    " are available."
+                );
+
+                return false;
+            }
+
+        }
+
+
+        return true;
+
+    }
+    catch (error) {
+
+        console.error(
+            "Cart stock check error:",
+            error
+        );
+
+
+        alert(
+            "Could not check the latest book stock.\n\n" +
+            "Please check your connection and try again."
+        );
+
+
+        return false;
+    }
 }
 
 
@@ -4771,7 +4833,7 @@ function validateCartStock() {
    CART -> DELIVERY ADDRESS
 ===================================================== */
 
-function goToPayment() {
+async function goToPayment() {
 
     const customer =
         getCurrentCustomer();
@@ -4803,9 +4865,9 @@ function goToPayment() {
     }
 
 
-    if (!validateCartStock()) {
-        return;
-    }
+   if (!(await validateCartStock())) {
+    return;
+}
 
 
     loadSavedAddress();
@@ -5257,10 +5319,9 @@ async function confirmOnlinePayment() {
     // CHECK STOCK
     // ==========================================
 
-    if (!validateCartStock()) {
-
-        return;
-    }
+   if (!(await validateCartStock())) {
+    return;
+}
 
 
     // ==========================================
@@ -5313,25 +5374,72 @@ async function confirmOnlinePayment() {
     }
 
 
-    // ==========================================
-    // PREVENT SAME REFERENCE ID BEING REUSED
-    // ==========================================
+  // ==========================================
+// CHECK TRANSACTION ID FROM FIRESTORE
+// ==========================================
 
-    let orders =
-        getOrders();
+let orders = [];
 
+try {
+
+    /*
+       Load this customer's existing orders
+       directly from Firestore.
+    */
+
+    const snapshot =
+        await db.collection("orders")
+            .where(
+                "customerId",
+                "==",
+                customer.id
+            )
+            .get();
+
+
+    snapshot.forEach(
+        function (doc) {
+
+            orders.push({
+
+                ...doc.data(),
+
+                id:
+                    doc.data().id ||
+                    doc.id
+
+            });
+
+        }
+    );
+
+
+    /* =========================================
+       CASE-INSENSITIVE DUPLICATE CHECK
+    ========================================= */
 
     const transactionAlreadyUsed =
-        orders.some(function (order) {
+        orders.some(
+            function (order) {
 
-            return (
-                order.transactionId &&
-                String(order.transactionId)
-                    .toLowerCase() ===
-                transactionId.toLowerCase()
-            );
+                return (
 
-        });
+                    order.transactionId &&
+
+                    String(
+                        order.transactionId
+                    )
+                        .trim()
+                        .toLowerCase() ===
+
+                    transactionId
+                        .trim()
+                        .toLowerCase()
+
+                );
+
+            }
+        );
 
 
     if (transactionAlreadyUsed) {
@@ -5342,6 +5450,23 @@ async function confirmOnlinePayment() {
 
         return;
     }
+
+}
+catch (error) {
+
+    console.error(
+        "Transaction ID check error:",
+        error
+    );
+
+
+    alert(
+        "Could not verify the transaction/reference ID.\n\n" +
+        "Please check your connection and try again."
+    );
+
+    return;
+}
 
 
     // ==========================================
@@ -5534,9 +5659,9 @@ async function processPayment() {
     }
 
 
-    if (!validateCartStock()) {
-        return;
-    }
+   if (!(await validateCartStock())) {
+    return;
+}
 
 
     const payment =
@@ -5685,136 +5810,6 @@ catch (error) {
     showPage("receipt");
 }
 
-
-/* =====================================================
-   REDUCE STOCK AFTER PURCHASE - FIRESTORE
-===================================================== */
-
-async function reducePurchasedStock(cart) {
-
-    try {
-
-        await db.runTransaction(
-            async function (transaction) {
-
-                const updates = [];
-
-
-                /*
-                   FIRST READ ALL BOOKS
-                */
-
-                for (const cartBook of cart) {
-
-                    const bookRef =
-                        db.collection("books")
-                            .doc(String(cartBook.id));
-
-
-                    const bookDoc =
-                        await transaction.get(bookRef);
-
-
-                    if (!bookDoc.exists) {
-
-                        throw new Error(
-                            cartBook.title +
-                            " is no longer available."
-                        );
-                    }
-
-
-                    const bookData =
-                        bookDoc.data();
-
-
-                    const currentStock =
-                        Number(bookData.stock) || 0;
-
-
-                    const quantity =
-                        Number(cartBook.quantity) || 1;
-
-
-                    if (quantity > currentStock) {
-
-                        throw new Error(
-                            "Not enough stock for " +
-                            cartBook.title +
-                            ". Available: " +
-                            currentStock
-                        );
-                    }
-
-
-                    updates.push({
-
-                        ref: bookRef,
-
-                        newStock:
-                            currentStock -
-                            quantity
-
-                    });
-                }
-
-
-                /*
-                   AFTER ALL READS,
-                   UPDATE STOCK
-                */
-
-                updates.forEach(
-                    function (item) {
-
-                        transaction.update(
-                            item.ref,
-                            {
-                                stock:
-                                    item.newStock
-                            }
-                        );
-
-                    }
-                );
-
-            }
-        );
-
-
-        console.log(
-            "Book stock updated in Firestore."
-        );
-
-
-        /*
-           Reload books and refresh
-           local book cache
-        */
-
-        await displayBooks();
-
-
-        return true;
-
-    }
-    catch (error) {
-
-        console.error(
-            "Stock update error:",
-            error
-        );
-
-
-        alert(
-            "Stock could not be updated.\n\n" +
-            error.message
-        );
-
-
-        return false;
-    }
-}
 
 /* =====================================================
    RECEIPT
@@ -7228,7 +7223,7 @@ catch (error) {
 }
 
 /* =====================================================
-   VERIFY PAYMENT - MANAGER
+   VERIFY UPI PAYMENT - MANAGER - ATOMIC TRANSACTION
 ===================================================== */
 
 async function managerVerifyPayment(orderId) {
@@ -7247,416 +7242,620 @@ async function managerVerifyPayment(orderId) {
     }
 
 
-    /* =========================================
-       ADMIN PERMISSION CHECK
-    ========================================= */
-
-    if (!managerCanVerifyPayments()) {
-
-        alert(
-            "You do not have permission to verify customer payments."
-        );
-
-        return;
-    }
+    const user =
+        auth.currentUser;
 
 
-    /* =========================================
-       GET CURRENT MANAGER
-    ========================================= */
-
-    const currentManager =
-        getCurrentManager();
-
-
-    if (!currentManager) {
+    if (!user) {
 
         alert(
-            "Manager information not found."
+            "Manager Firebase session not found. Please login again."
         );
 
         return;
     }
 
 
-    /* =========================================
-       GET FRESH MANAGER RECORD
-    ========================================= */
+    try {
 
-    const managers =
-        getManagers();
+        const managerRef =
+            db.collection("managers")
+                .doc(user.uid);
 
 
-    const manager =
-        managers.find(
-            function (item) {
+        const orderRef =
+            db.collection("orders")
+                .doc(String(orderId));
 
-                return (
-                    String(item.managerId) ===
-                    String(currentManager.managerId)
-                );
 
-            }
-        );
+        /* =========================================
+           LOAD DATA FOR CONFIRMATION WINDOW
+        ========================================= */
 
+        const previewResults =
+            await Promise.all([
 
-    if (
-        !manager ||
-        manager.status !== "Approved" ||
-        manager.canVerifyPayments !== true
-    ) {
+                managerRef.get(),
 
-        alert(
-            "Your payment verification permission is not available."
-        );
+                orderRef.get()
 
-        return;
-    }
+            ]);
 
 
-    /* =========================================
-       FIND ORDER
-    ========================================= */
+        const managerPreview =
+            previewResults[0];
 
-    let orders =
-        getOrders();
 
+        const orderPreview =
+            previewResults[1];
 
-    const index =
-        orders.findIndex(
-            function (order) {
 
-                return (
-                    String(order.id) ===
-                    String(orderId)
-                );
+        /* =========================================
+           CHECK MANAGER PROFILE
+        ========================================= */
 
-            }
-        );
-
-
-    if (index === -1) {
-
-        alert(
-            "Order not found."
-        );
-
-        return;
-    }
-
-
-    const order =
-        orders[index];
-
-
-    /* =========================================
-       ONLY UPI PAYMENT
-    ========================================= */
-
-    if (
-        order.paymentMethod !== "UPI"
-    ) {
-
-        alert(
-            "This is not a UPI payment."
-        );
-
-        return;
-    }
-
-
-    /* =========================================
-       CHECK PAYMENT IS STILL PENDING
-    ========================================= */
-
-    if (
-        order.paymentStatus &&
-        order.paymentStatus !==
-            "Pending Verification"
-    ) {
-
-        alert(
-            "This payment has already been processed.\n\n" +
-            "Current Status: " +
-            order.paymentStatus
-        );
-
-        displayManagerPaymentOrders();
-
-        return;
-    }
-
-
-    /* =========================================
-       CONFIRM WITH MANAGER
-    ========================================= */
-
-    const confirmed =
-        confirm(
-            "Have you confirmed that the payment was received?\n\n" +
-
-            "Order: " +
-            order.id +
-
-            "\nCustomer: " +
-            order.customer +
-
-            "\nAmount: ₹" +
-            order.total +
-
-            "\nTransaction ID: " +
-            (order.transactionId || "-")
-        );
-
-
-    if (!confirmed) {
-        return;
-    }
-
-
-    /* =========================================
-       CHECK AGAIN BEFORE CHANGING STOCK
-    ========================================= */
-
-    orders =
-        getOrders();
-
-
-    const freshIndex =
-        orders.findIndex(
-            function (item) {
-
-                return (
-                    String(item.id) ===
-                    String(orderId)
-                );
-
-            }
-        );
-
-
-    if (freshIndex === -1) {
-
-        alert(
-            "Order not found."
-        );
-
-        return;
-    }
-
-
-    const freshOrder =
-        orders[freshIndex];
-
-
-    if (
-        freshOrder.paymentStatus &&
-        freshOrder.paymentStatus !==
-            "Pending Verification"
-    ) {
-
-        alert(
-            "This payment has already been processed by another user."
-        );
-
-        displayManagerPaymentOrders();
-
-        return;
-    }
-
-
-    /* =========================================
-       REDUCE STOCK ONLY ONCE
-    ========================================= */
-
-    if (!freshOrder.stockReduced) {
-
-        if (
-            !validateOrderStock(
-                freshOrder.books
-            )
-        ) {
+        if (!managerPreview.exists) {
 
             alert(
-                "Payment was found, but the order cannot be confirmed because there is not enough stock."
+                "Manager profile not found."
             );
 
             return;
         }
 
 
-     const stockUpdated =
-    await reducePurchasedStock(
-        freshOrder.books
-    );
+        const previewManager =
+            managerPreview.data();
 
-if (!stockUpdated) {
-    return;
-}
 
-freshOrder.stockReduced =
-    true;
+        if (
+            previewManager.status !==
+                "Approved" ||
+
+            previewManager.canVerifyPayments !==
+                true
+        ) {
+
+            alert(
+                "You do not have permission to verify customer payments."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           CHECK ORDER
+        ========================================= */
+
+        if (!orderPreview.exists) {
+
+            alert(
+                "Order not found."
+            );
+
+            return;
+        }
+
+
+        const previewOrder =
+            orderPreview.data();
+
+
+        if (
+            previewOrder.paymentMethod !==
+            "UPI"
+        ) {
+
+            alert(
+                "This is not a UPI payment."
+            );
+
+            return;
+        }
+
+
+        if (
+            previewOrder.paymentStatus !==
+            "Pending Verification"
+        ) {
+
+            alert(
+                "This payment has already been processed.\n\n" +
+                "Current Status: " +
+                previewOrder.paymentStatus
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           MANAGER CONFIRMATION
+        ========================================= */
+
+        const confirmed =
+            confirm(
+
+                "Have you confirmed that the payment was received?\n\n" +
+
+                "Order: " +
+                (previewOrder.id || orderId) +
+
+                "\nCustomer: " +
+                (previewOrder.customer || "-") +
+
+                "\nAmount: ₹" +
+                (previewOrder.total || 0) +
+
+                "\nTransaction ID: " +
+                (previewOrder.transactionId || "-")
+
+            );
+
+
+        if (!confirmed) {
+
+            return;
+        }
+
+
+        const verifiedDate =
+            new Date()
+                .toLocaleString();
+
+
+        let verifiedManager = null;
+
+
+        /* =========================================
+           ONE FIRESTORE TRANSACTION
+        ========================================= */
+
+        await db.runTransaction(
+            async function (transaction) {
+
+                /* =================================
+                   GET FRESH MANAGER
+                ================================= */
+
+                const managerDoc =
+                    await transaction.get(
+                        managerRef
+                    );
+
+
+                if (!managerDoc.exists) {
+
+                    throw new Error(
+                        "Manager profile not found."
+                    );
+                }
+
+
+                const manager =
+                    managerDoc.data();
+
+
+                if (
+                    manager.status !==
+                        "Approved" ||
+
+                    manager.canVerifyPayments !==
+                        true
+                ) {
+
+                    throw new Error(
+                        "Your payment verification permission is no longer available."
+                    );
+                }
+
+
+                /* =================================
+                   GET FRESH ORDER
+                ================================= */
+
+                const orderDoc =
+                    await transaction.get(
+                        orderRef
+                    );
+
+
+                if (!orderDoc.exists) {
+
+                    throw new Error(
+                        "Order not found."
+                    );
+                }
+
+
+                const order =
+                    orderDoc.data();
+
+
+                /* =================================
+                   CHECK UPI
+                ================================= */
+
+                if (
+                    order.paymentMethod !==
+                    "UPI"
+                ) {
+
+                    throw new Error(
+                        "This is not a UPI payment."
+                    );
+                }
+
+
+                /* =================================
+                   CHECK STILL PENDING
+                ================================= */
+
+                if (
+                    order.paymentStatus !==
+                    "Pending Verification"
+                ) {
+
+                    throw new Error(
+                        "This payment has already been processed."
+                    );
+                }
+
+
+                if (
+                    order.stockReduced === true
+                ) {
+
+                    throw new Error(
+                        "Stock has already been reduced for this order."
+                    );
+                }
+
+
+                if (
+                    !Array.isArray(
+                        order.books
+                    ) ||
+                    order.books.length === 0
+                ) {
+
+                    throw new Error(
+                        "No books found in this order."
+                    );
+                }
+
+
+                /* =================================
+                   READ ALL BOOKS
+                ================================= */
+
+                const stockUpdates = [];
+
+
+                for (
+                    const orderBook
+                    of order.books
+                ) {
+
+                    const bookRef =
+                        db.collection("books")
+                            .doc(
+                                String(
+                                    orderBook.id
+                                )
+                            );
+
+
+                    const bookDoc =
+                        await transaction.get(
+                            bookRef
+                        );
+
+
+                    if (!bookDoc.exists) {
+
+                        throw new Error(
+                            orderBook.title +
+                            " is no longer available."
+                        );
+                    }
+
+
+                    const book =
+                        bookDoc.data();
+
+
+                    const currentStock =
+                        Number(
+                            book.stock
+                        ) || 0;
+
+
+                    const quantity =
+                        Number(
+                            orderBook.quantity
+                        ) || 1;
+
+
+                    if (
+                        !Number.isInteger(
+                            quantity
+                        ) ||
+                        quantity <= 0
+                    ) {
+
+                        throw new Error(
+                            "Invalid quantity for " +
+                            orderBook.title
+                        );
+                    }
+
+
+                    if (
+                        quantity >
+                        currentStock
+                    ) {
+
+                        throw new Error(
+                            "Not enough stock for " +
+                            orderBook.title +
+                            ". Available: " +
+                            currentStock
+                        );
+                    }
+
+
+                    stockUpdates.push({
+
+                        ref:
+                            bookRef,
+
+                        newStock:
+                            currentStock -
+                            quantity
+
+                    });
+
+                }
+
+
+                /* =================================
+                   REDUCE STOCK
+                ================================= */
+
+                stockUpdates.forEach(
+                    function (item) {
+
+                        transaction.update(
+                            item.ref,
+                            {
+
+                                stock:
+                                    item.newStock
+
+                            }
+                        );
+
+                    }
+                );
+
+
+                /* =================================
+                   VERIFY ORDER
+                ================================= */
+
+                transaction.update(
+                    orderRef,
+                    {
+
+                        paymentStatus:
+                            "Verified",
+
+                        status:
+                            "Order Confirmed",
+
+                        stockReduced:
+                            true,
+
+                        paymentVerifiedDate:
+                            verifiedDate,
+
+                        paymentVerifiedByRole:
+                            "Manager",
+
+                        paymentVerifiedByManagerId:
+                            manager.managerId,
+
+                        paymentVerifiedByManagerName:
+                            manager.name
+
+                    }
+                );
+
+
+                verifiedManager = {
+
+                    managerId:
+                        manager.managerId,
+
+                    name:
+                        manager.name
+
+                };
+
+            }
+        );
+
+
+        console.log(
+            "Manager UPI payment verified atomically:",
+            orderId
+        );
+
+
+        /* =========================================
+           LOAD UPDATED ORDER
+        ========================================= */
+
+        const updatedDoc =
+            await orderRef.get();
+
+
+        const updatedOrder =
+            updatedDoc.exists
+                ? {
+                    ...updatedDoc.data(),
+
+                    id:
+                        updatedDoc.data().id ||
+                        updatedDoc.id
+                }
+                : null;
+
+
+        /* =========================================
+           UPDATE LOCAL CACHE
+        ========================================= */
+
+        if (updatedOrder) {
+
+            let orders =
+                getOrders();
+
+
+            const index =
+                orders.findIndex(
+                    function (order) {
+
+                        return (
+                            String(order.id) ===
+                            String(orderId)
+                        );
+                    }
+                );
+
+
+            if (index >= 0) {
+
+                orders[index] =
+                    updatedOrder;
+
+            }
+            else {
+
+                orders.push(
+                    updatedOrder
+                );
+
+            }
+
+
+            localStorage.setItem(
+                "orders",
+                JSON.stringify(
+                    orders
+                )
+            );
+
+
+            const latestOrder =
+                JSON.parse(
+                    localStorage.getItem(
+                        "latestOrder"
+                    ) || "null"
+                );
+
+
+            if (
+                latestOrder &&
+                String(latestOrder.id) ===
+                String(orderId)
+            ) {
+
+                localStorage.setItem(
+                    "latestOrder",
+                    JSON.stringify(
+                        updatedOrder
+                    )
+                );
+
+            }
+
+        }
+
+
+        /* =========================================
+           REFRESH WEBSITE
+        ========================================= */
+
+        await displayBooks();
+
+        await displayManagerPaymentOrders();
+
+        await displayOrderDetails();
+
+        displayPurchaseHistory();
+
+        displayCart();
+
+        displayBookDetails();
+
+        updateDashboard();
+
+
+        alert(
+            "Payment verified successfully!\n\n" +
+
+            "Verified By: " +
+            (
+                verifiedManager
+                    ? verifiedManager.name
+                    : "Manager"
+            ) +
+
+            (
+                verifiedManager
+                    ? "\nManager ID: " +
+                      verifiedManager.managerId
+                    : ""
+            )
+        );
+
     }
-    /* =========================================
-       VERIFY PAYMENT
-    ========================================= */
+    catch (error) {
 
-    freshOrder.paymentStatus =
-        "Verified";
-
-
-    freshOrder.status =
-        "Order Confirmed";
-
-
-    freshOrder.paymentVerifiedDate =
-        new Date().toLocaleString();
-
-
-    /* =========================================
-       SAVE WHO VERIFIED PAYMENT
-    ========================================= */
-
-    freshOrder.paymentVerifiedByRole =
-        "Manager";
-
-
-    freshOrder.paymentVerifiedByManagerId =
-        manager.managerId;
-
-
-    freshOrder.paymentVerifiedByManagerName =
-        manager.name;
-
-       /* =========================================
-   SAVE VERIFIED ORDER TO FIRESTORE
-========================================= */
-
-try {
-
-    await db.collection("orders")
-        .doc(String(freshOrder.id))
-        .set(
-            freshOrder,
-            { merge: true }
-        );
-
-    console.log(
-        "Manager verification saved to Firestore:",
-        freshOrder.id
-    );
-
-}
-catch (error) {
-
-    console.error(
-        "Error saving payment verification:",
-        error
-    );
-
-    alert(
-        "Payment verification could not be saved online."
-    );
-
-    return;
-}
-
-
-    /* =========================================
-       SAVE ORDERS
-    ========================================= */
-
-    localStorage.setItem(
-        "orders",
-        JSON.stringify(orders)
-    );
-
-
-    /* =========================================
-       UPDATE LATEST ORDER
-    ========================================= */
-
-    const latestOrder =
-        JSON.parse(
-            localStorage.getItem(
-                "latestOrder"
-            ) || "null"
+        console.error(
+            "Manager UPI verification error:",
+            error
         );
 
 
-    if (
-        latestOrder &&
-        String(latestOrder.id) ===
-        String(orderId)
-    ) {
+        if (
+            error.code ===
+            "permission-denied"
+        ) {
 
-        latestOrder.paymentStatus =
-            "Verified";
+            alert(
+                "Manager does not have permission to verify this payment."
+            );
 
+        }
+        else {
 
-        latestOrder.status =
-            "Order Confirmed";
+            alert(
+                "Payment verification failed.\n\n" +
+                error.message
+            );
+        }
 
-
-        latestOrder.stockReduced =
-            freshOrder.stockReduced;
-
-
-        latestOrder.paymentVerifiedDate =
-            freshOrder.paymentVerifiedDate;
-
-
-        latestOrder.paymentVerifiedByRole =
-            "Manager";
-
-
-        latestOrder.paymentVerifiedByManagerId =
-            manager.managerId;
-
-
-        latestOrder.paymentVerifiedByManagerName =
-            manager.name;
-
-
-        localStorage.setItem(
-            "latestOrder",
-            JSON.stringify(latestOrder)
-        );
     }
 
-
-    /* =========================================
-       REFRESH WEBSITE
-    ========================================= */
-
-    displayManagerPaymentOrders();
-
-    displayOrderDetails();
-
-    displayPurchaseHistory();
-
-    displayBooks();
-
-    displayCart();
-
-    displayBookDetails();
-
-    updateDashboard();
-
-
-    alert(
-        "Payment verified successfully!\n\n" +
-
-        "Verified By: " +
-        manager.name +
-
-        "\nManager ID: " +
-        manager.managerId
-    );
 }
+
 
 /* =====================================================
-   REJECT PAYMENT - MANAGER
+   REJECT UPI PAYMENT - MANAGER - FIRESTORE TRANSACTION
 ===================================================== */
 
 async function managerRejectPayment(orderId) {
@@ -7675,375 +7874,462 @@ async function managerRejectPayment(orderId) {
     }
 
 
-    /* =========================================
-       ADMIN PERMISSION CHECK
-    ========================================= */
+    const user =
+        auth.currentUser;
 
-    if (!managerCanVerifyPayments()) {
+
+    if (!user) {
 
         alert(
-            "You do not have permission to reject customer payments."
+            "Manager Firebase session not found. Please login again."
         );
 
         return;
     }
 
 
-    /* =========================================
-       GET CURRENT MANAGER
-    ========================================= */
+    try {
 
-    const currentManager =
-        getCurrentManager();
-
-
-    if (!currentManager) {
-
-        alert(
-            "Manager information not found."
-        );
-
-        return;
-    }
+        const managerRef =
+            db.collection("managers")
+                .doc(user.uid);
 
 
-    /* =========================================
-       GET FRESH MANAGER RECORD
-    ========================================= */
-
-    const managers =
-        getManagers();
+        const orderRef =
+            db.collection("orders")
+                .doc(String(orderId));
 
 
-    const manager =
-        managers.find(
-            function (item) {
+        /* =========================================
+           PREVIEW DATA
+        ========================================= */
 
-                return (
-                    String(item.managerId) ===
-                    String(currentManager.managerId)
-                );
+        const results =
+            await Promise.all([
 
-            }
-        );
+                managerRef.get(),
 
+                orderRef.get()
 
-    if (
-        !manager ||
-        manager.status !== "Approved" ||
-        manager.canVerifyPayments !== true
-    ) {
-
-        alert(
-            "Your payment verification permission is not available."
-        );
-
-        return;
-    }
+            ]);
 
 
-    /* =========================================
-       GET ORDERS
-    ========================================= */
+        const managerDoc =
+            results[0];
 
-    let orders =
-        getOrders();
-
-
-    const index =
-        orders.findIndex(
-            function (order) {
-
-                return (
-                    String(order.id) ===
-                    String(orderId)
-                );
-
-            }
-        );
+        const orderDoc =
+            results[1];
 
 
-    if (index === -1) {
+        /* =========================================
+           CHECK MANAGER
+        ========================================= */
 
-        alert(
-            "Order not found."
-        );
+        if (!managerDoc.exists) {
 
-        return;
-    }
+            alert(
+                "Manager profile not found."
+            );
 
-
-    const order =
-        orders[index];
-
-
-    /* =========================================
-       ONLY UPI PAYMENT
-    ========================================= */
-
-    if (
-        order.paymentMethod !== "UPI"
-    ) {
-
-        alert(
-            "This is not a UPI payment."
-        );
-
-        return;
-    }
+            return;
+        }
 
 
-    /* =========================================
-       CHECK PAYMENT IS STILL PENDING
-    ========================================= */
+        const manager =
+            managerDoc.data();
 
-    if (
-        order.paymentStatus &&
-        order.paymentStatus !==
+
+        if (
+            manager.status !==
+                "Approved" ||
+
+            manager.canVerifyPayments !==
+                true
+        ) {
+
+            alert(
+                "You do not have permission to reject customer payments."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           CHECK ORDER
+        ========================================= */
+
+        if (!orderDoc.exists) {
+
+            alert(
+                "Order not found."
+            );
+
+            return;
+        }
+
+
+        const order =
+            orderDoc.data();
+
+
+        if (
+            order.paymentMethod !==
+            "UPI"
+        ) {
+
+            alert(
+                "This is not a UPI payment."
+            );
+
+            return;
+        }
+
+
+        if (
+            order.paymentStatus !==
             "Pending Verification"
-    ) {
+        ) {
 
-        alert(
-            "This payment has already been processed.\n\n" +
-            "Current Status: " +
-            order.paymentStatus
-        );
+            alert(
+                "This payment has already been processed.\n\n" +
+                "Current Status: " +
+                order.paymentStatus
+            );
 
-
-        displayManagerPaymentOrders();
-
-        return;
-    }
+            return;
+        }
 
 
-    /* =========================================
-       CONFIRM REJECTION
-    ========================================= */
+        /* =========================================
+           CONFIRM REJECTION
+        ========================================= */
 
-    const confirmed =
-        confirm(
-            "Are you sure you want to reject this payment?\n\n" +
+        const confirmed =
+            confirm(
 
-            "Order: " +
-            order.id +
+                "Are you sure you want to reject this payment?\n\n" +
 
-            "\nCustomer: " +
-            order.customer +
+                "Order: " +
+                (order.id || orderId) +
 
-            "\nAmount: ₹" +
-            order.total +
+                "\nCustomer: " +
+                (order.customer || "-") +
 
-            "\nTransaction ID: " +
-            (order.transactionId || "-")
-        );
+                "\nAmount: ₹" +
+                (order.total || 0) +
 
+                "\nTransaction ID: " +
+                (order.transactionId || "-")
 
-    if (!confirmed) {
-        return;
-    }
+            );
 
 
-    /* =========================================
-       GET FRESH ORDER AGAIN
-    ========================================= */
+        if (!confirmed) {
 
-    orders =
-        getOrders();
+            return;
+        }
 
 
-    const freshIndex =
-        orders.findIndex(
-            function (item) {
+        const rejectedDate =
+            new Date()
+                .toLocaleString();
 
-                return (
-                    String(item.id) ===
-                    String(orderId)
+
+        let rejectedManager = null;
+
+
+        /* =========================================
+           ATOMIC FIRESTORE TRANSACTION
+        ========================================= */
+
+        await db.runTransaction(
+            async function (transaction) {
+
+                /* GET FRESH MANAGER */
+
+                const freshManagerDoc =
+                    await transaction.get(
+                        managerRef
+                    );
+
+
+                if (!freshManagerDoc.exists) {
+
+                    throw new Error(
+                        "Manager profile not found."
+                    );
+                }
+
+
+                const freshManager =
+                    freshManagerDoc.data();
+
+
+                if (
+                    freshManager.status !==
+                        "Approved" ||
+
+                    freshManager.canVerifyPayments !==
+                        true
+                ) {
+
+                    throw new Error(
+                        "Your payment verification permission is no longer available."
+                    );
+                }
+
+
+                /* GET FRESH ORDER */
+
+                const freshOrderDoc =
+                    await transaction.get(
+                        orderRef
+                    );
+
+
+                if (!freshOrderDoc.exists) {
+
+                    throw new Error(
+                        "Order not found."
+                    );
+                }
+
+
+                const freshOrder =
+                    freshOrderDoc.data();
+
+
+                if (
+                    freshOrder.paymentMethod !==
+                    "UPI"
+                ) {
+
+                    throw new Error(
+                        "This is not a UPI payment."
+                    );
+                }
+
+
+                /*
+                   CRITICAL:
+                   Only reject if still pending.
+                */
+
+                if (
+                    freshOrder.paymentStatus !==
+                    "Pending Verification"
+                ) {
+
+                    throw new Error(
+                        "This payment has already been processed."
+                    );
+                }
+
+
+                /* =================================
+                   REJECT PAYMENT
+                ================================= */
+
+                transaction.update(
+                    orderRef,
+                    {
+
+                        paymentStatus:
+                            "Rejected",
+
+                        status:
+                            "Payment Failed",
+
+                        paymentRejectedDate:
+                            rejectedDate,
+
+                        paymentRejectedByRole:
+                            "Manager",
+
+                        paymentRejectedByManagerId:
+                            freshManager.managerId,
+
+                        paymentRejectedByManagerName:
+                            freshManager.name
+
+                    }
                 );
+
+
+                rejectedManager = {
+
+                    managerId:
+                        freshManager.managerId,
+
+                    name:
+                        freshManager.name
+
+                };
 
             }
         );
 
 
-    if (freshIndex === -1) {
+        console.log(
+            "Manager rejected UPI payment:",
+            orderId
+        );
+
+
+        /* =========================================
+           LOAD UPDATED ORDER
+        ========================================= */
+
+        const updatedDoc =
+            await orderRef.get();
+
+
+        const updatedOrder =
+            updatedDoc.exists
+                ? {
+                    ...updatedDoc.data(),
+
+                    id:
+                        updatedDoc.data().id ||
+                        updatedDoc.id
+                }
+                : null;
+
+
+        /* =========================================
+           UPDATE LOCAL CACHE
+        ========================================= */
+
+        if (updatedOrder) {
+
+            let orders =
+                getOrders();
+
+
+            const index =
+                orders.findIndex(
+                    function (item) {
+
+                        return (
+                            String(item.id) ===
+                            String(orderId)
+                        );
+
+                    }
+                );
+
+
+            if (index >= 0) {
+
+                orders[index] =
+                    updatedOrder;
+
+            }
+            else {
+
+                orders.push(
+                    updatedOrder
+                );
+
+            }
+
+
+            localStorage.setItem(
+                "orders",
+                JSON.stringify(
+                    orders
+                )
+            );
+
+
+            const latestOrder =
+                JSON.parse(
+                    localStorage.getItem(
+                        "latestOrder"
+                    ) || "null"
+                );
+
+
+            if (
+                latestOrder &&
+                String(latestOrder.id) ===
+                String(orderId)
+            ) {
+
+                localStorage.setItem(
+                    "latestOrder",
+                    JSON.stringify(
+                        updatedOrder
+                    )
+                );
+
+            }
+
+        }
+
+
+        /* =========================================
+           REFRESH
+        ========================================= */
+
+        await displayManagerPaymentOrders();
+
+        await displayOrderDetails();
+
+        displayPurchaseHistory();
+
+        updateDashboard();
+
 
         alert(
-            "Order not found."
+            "Payment rejected.\n\n" +
+
+            "Rejected By: " +
+            (
+                rejectedManager
+                    ? rejectedManager.name
+                    : "Manager"
+            ) +
+
+            (
+                rejectedManager
+                    ? "\nManager ID: " +
+                      rejectedManager.managerId
+                    : ""
+            )
         );
 
-        return;
+    }
+    catch (error) {
+
+        console.error(
+            "Manager payment rejection error:",
+            error
+        );
+
+
+        if (
+            error.code ===
+            "permission-denied"
+        ) {
+
+            alert(
+                "Manager does not have permission to reject this payment."
+            );
+
+        }
+        else {
+
+            alert(
+                "Payment rejection failed.\n\n" +
+                error.message
+            );
+
+        }
+
     }
 
-
-    const freshOrder =
-        orders[freshIndex];
-
-
-    /* =========================================
-       CHECK AGAIN
-    ========================================= */
-
-    if (
-        freshOrder.paymentStatus &&
-        freshOrder.paymentStatus !==
-            "Pending Verification"
-    ) {
-
-        alert(
-            "This payment has already been processed by another user."
-        );
-
-
-        displayManagerPaymentOrders();
-
-        return;
-    }
-
-
-    /* =========================================
-       REJECT PAYMENT
-    ========================================= */
-
-    freshOrder.paymentStatus =
-        "Rejected";
-
-
-    freshOrder.status =
-        "Payment Failed";
-
-
-    freshOrder.paymentRejectedDate =
-        new Date().toLocaleString();
-
-
-    /* =========================================
-       SAVE WHO REJECTED PAYMENT
-    ========================================= */
-
-    freshOrder.paymentRejectedByRole =
-        "Manager";
-
-
-    freshOrder.paymentRejectedByManagerId =
-        manager.managerId;
-
-
-    freshOrder.paymentRejectedByManagerName =
-        manager.name;
-
-   /* =========================================
-   SAVE REJECTED ORDER TO FIRESTORE
-========================================= */
-
-try {
-
-    await db.collection("orders")
-        .doc(String(freshOrder.id))
-        .set(
-            freshOrder,
-            { merge: true }
-        );
-
-    console.log(
-        "Manager rejection saved to Firestore:",
-        freshOrder.id
-    );
-
-}
-catch (error) {
-
-    console.error(
-        "Error saving payment rejection:",
-        error
-    );
-
-    alert(
-        "Payment rejection could not be saved online."
-    );
-
-    return;
-}
-
-    /* =========================================
-       SAVE ORDERS
-    ========================================= */
-
-    localStorage.setItem(
-        "orders",
-        JSON.stringify(orders)
-    );
-
-
-    /* =========================================
-       UPDATE LATEST ORDER
-    ========================================= */
-
-    const latestOrder =
-        JSON.parse(
-            localStorage.getItem(
-                "latestOrder"
-            ) || "null"
-        );
-
-
-    if (
-        latestOrder &&
-        String(latestOrder.id) ===
-        String(orderId)
-    ) {
-
-        latestOrder.paymentStatus =
-            "Rejected";
-
-
-        latestOrder.status =
-            "Payment Failed";
-
-
-        latestOrder.paymentRejectedDate =
-            freshOrder.paymentRejectedDate;
-
-
-        latestOrder.paymentRejectedByRole =
-            "Manager";
-
-
-        latestOrder.paymentRejectedByManagerId =
-            manager.managerId;
-
-
-        latestOrder.paymentRejectedByManagerName =
-            manager.name;
-
-
-        localStorage.setItem(
-            "latestOrder",
-            JSON.stringify(latestOrder)
-        );
-    }
-
-
-    /* =========================================
-       REFRESH WEBSITE
-    ========================================= */
-
-    displayManagerPaymentOrders();
-
-    displayOrderDetails();
-
-    displayPurchaseHistory();
-
-    updateDashboard();
-
-
-    alert(
-        "Payment rejected.\n\n" +
-
-        "Rejected By: " +
-        manager.name +
-
-        "\nManager ID: " +
-        manager.managerId
-    );
 }
 
 
@@ -8454,7 +8740,7 @@ async function updateManagerStock(bookId) {
    DISPLAY CUSTOMER ACTIVITY - MANAGER
 ===================================================== */
 
-function displayManagerCustomerActivity() {
+async function displayManagerCustomerActivity() {
 
     const container =
         document.getElementById(
@@ -8476,12 +8762,89 @@ function displayManagerCustomerActivity() {
     }
 
 
+   /* =========================================
+   LOAD LATEST ORDERS FROM FIRESTORE
+========================================= */
+
+let orders = [];
+
+try {
+
+    const snapshot =
+        await db.collection("orders")
+            .get();
+
+
+    snapshot.forEach(
+        function (doc) {
+
+            const data =
+                doc.data();
+
+
+            orders.push({
+
+                ...data,
+
+                id:
+                    data.id ||
+                    doc.id
+
+            });
+
+        }
+    );
+
+
     /* =========================================
-       GET ORDERS
+       NEWEST ORDERS FIRST
     ========================================= */
 
-    const orders =
-        getOrders();
+    orders.sort(
+        function (a, b) {
+
+            return String(
+                b.id || ""
+            ).localeCompare(
+                String(
+                    a.id || ""
+                )
+            );
+
+        }
+    );
+
+
+    console.log(
+        "Manager customer activity loaded from Firestore:",
+        orders.length
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading Manager customer activity:",
+        error
+    );
+
+
+    container.innerHTML = `
+        <div class="empty-message">
+
+            <h3>
+                Customer activity could not be loaded.
+            </h3>
+
+            <p>
+                Please check your connection and try again.
+            </p>
+
+        </div>
+    `;
+
+    return;
+}
 
 
     // Clear old activity
@@ -8519,7 +8882,7 @@ function displayManagerCustomerActivity() {
     ========================================= */
 
     const latestOrders =
-        orders.slice().reverse();
+    orders;
 
 
     latestOrders.forEach(function (order) {
@@ -12846,6 +13209,10 @@ async function verifyOrderPayment(orderId) {
     }
 }
 
+/* =====================================================
+   REJECT UPI PAYMENT - ADMIN - FIRESTORE TRANSACTION
+===================================================== */
+
 async function rejectOrderPayment(orderId) {
 
     /* =========================================
@@ -12858,7 +13225,9 @@ async function rejectOrderPayment(orderId) {
             "Admin permission required."
         );
 
-        showPage("accountPage");
+        showPage(
+            "accountPage"
+        );
 
         showAccountForm(
             "adminLoginForm"
@@ -12868,277 +13237,328 @@ async function rejectOrderPayment(orderId) {
     }
 
 
-    /* =========================================
-       GET CURRENT ORDER
-    ========================================= */
+    try {
 
-    let orders = getOrders();
+        const orderRef =
+            db.collection("orders")
+                .doc(String(orderId));
 
-    let index =
-        orders.findIndex(
-            function (order) {
 
-                return (
-                    String(order.id) ===
-                    String(orderId)
+        /* =========================================
+           LOAD CURRENT ORDER FOR CONFIRMATION
+        ========================================= */
+
+        const orderDoc =
+            await orderRef.get();
+
+
+        if (!orderDoc.exists) {
+
+            alert(
+                "Order not found."
+            );
+
+            return;
+        }
+
+
+        const order =
+            orderDoc.data();
+
+
+        /* =========================================
+           CHECK UPI
+        ========================================= */
+
+        if (
+            order.paymentMethod !==
+            "UPI"
+        ) {
+
+            alert(
+                "This is not a UPI payment."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           CHECK STILL PENDING
+        ========================================= */
+
+        if (
+            order.paymentStatus !==
+            "Pending Verification"
+        ) {
+
+            alert(
+                "This payment has already been processed.\n\n" +
+                "Current Status: " +
+                order.paymentStatus
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           CONFIRM REJECTION
+        ========================================= */
+
+        const confirmed =
+            confirm(
+
+                "Reject this customer payment?\n\n" +
+
+                "Order: " +
+                (order.id || orderId) +
+
+                "\nCustomer: " +
+                (order.customer || "-") +
+
+                "\nTransaction ID: " +
+                (order.transactionId || "-") +
+
+                "\nAmount: ₹" +
+                (order.total || 0)
+
+            );
+
+
+        if (!confirmed) {
+
+            return;
+        }
+
+
+        const rejectedDate =
+            new Date()
+                .toLocaleString();
+
+
+        /* =========================================
+           ATOMIC FIRESTORE TRANSACTION
+        ========================================= */
+
+        await db.runTransaction(
+            async function (transaction) {
+
+                const freshOrderDoc =
+                    await transaction.get(
+                        orderRef
+                    );
+
+
+                if (!freshOrderDoc.exists) {
+
+                    throw new Error(
+                        "Order not found."
+                    );
+                }
+
+
+                const freshOrder =
+                    freshOrderDoc.data();
+
+
+                /* CHECK PAYMENT TYPE AGAIN */
+
+                if (
+                    freshOrder.paymentMethod !==
+                    "UPI"
+                ) {
+
+                    throw new Error(
+                        "This is not a UPI payment."
+                    );
+                }
+
+
+                /* CRITICAL FRESH STATUS CHECK */
+
+                if (
+                    freshOrder.paymentStatus !==
+                    "Pending Verification"
+                ) {
+
+                    throw new Error(
+                        "This payment has already been processed."
+                    );
+                }
+
+
+                /* =================================
+                   REJECT PAYMENT
+                ================================= */
+
+                transaction.update(
+                    orderRef,
+                    {
+
+                        paymentStatus:
+                            "Rejected",
+
+                        status:
+                            "Payment Failed",
+
+                        paymentRejectedDate:
+                            rejectedDate,
+
+                        paymentRejectedByRole:
+                            "Admin"
+
+                    }
                 );
+
             }
         );
 
 
-    if (index === -1) {
-
-        alert(
-            "Order not found."
-        );
-
-        return;
-    }
-
-
-    let order =
-        orders[index];
-
-
-    /* =========================================
-       UPI PAYMENT CHECK
-    ========================================= */
-
-    if (order.paymentMethod !== "UPI") {
-
-        alert(
-            "This is not a UPI payment."
-        );
-
-        return;
-    }
-
-
-    /* =========================================
-       CHECK PAYMENT IS STILL PENDING
-    ========================================= */
-
-    if (
-        order.paymentStatus &&
-        order.paymentStatus !==
-            "Pending Verification"
-    ) {
-
-        alert(
-            "This payment has already been processed.\n\n" +
-            "Current Status: " +
-            order.paymentStatus
-        );
-
-        displayOrderDetails();
-
-        return;
-    }
-
-
-    /* =========================================
-       ADMIN CONFIRMATION
-    ========================================= */
-
-    const confirmed =
-        confirm(
-            "Reject this customer payment?\n\n" +
-            "Order: " +
-            order.id +
-            "\nTransaction ID: " +
-            (order.transactionId || "-") +
-            "\nAmount: ₹" +
-            order.total
+        console.log(
+            "Admin rejected UPI payment:",
+            orderId
         );
 
 
-    if (!confirmed) {
-        return;
-    }
+        /* =========================================
+           LOAD UPDATED ORDER
+        ========================================= */
+
+        const updatedDoc =
+            await orderRef.get();
 
 
-    /* =========================================
-       GET FRESH ORDER DATA AGAIN
+        const updatedOrder =
+            updatedDoc.exists
+                ? {
+                    ...updatedDoc.data(),
 
-       Manager or another Admin action may have
-       processed the payment while confirmation
-       was open.
-    ========================================= */
+                    id:
+                        updatedDoc.data().id ||
+                        updatedDoc.id
+                }
+                : null;
 
-    orders = getOrders();
+
+        /* =========================================
+           UPDATE LOCAL CACHE
+        ========================================= */
+
+        if (updatedOrder) {
+
+            let orders =
+                getOrders();
 
 
-    index =
-        orders.findIndex(
-            function (item) {
+            const index =
+                orders.findIndex(
+                    function (item) {
 
-                return (
-                    String(item.id) ===
-                    String(orderId)
+                        return (
+                            String(item.id) ===
+                            String(orderId)
+                        );
+
+                    }
                 );
+
+
+            if (index >= 0) {
+
+                orders[index] =
+                    updatedOrder;
+
             }
-        );
+            else {
+
+                orders.push(
+                    updatedOrder
+                );
+
+            }
 
 
-    if (index === -1) {
+            localStorage.setItem(
+                "orders",
+                JSON.stringify(
+                    orders
+                )
+            );
+
+
+            const latestOrder =
+                JSON.parse(
+                    localStorage.getItem(
+                        "latestOrder"
+                    ) || "null"
+                );
+
+
+            if (
+                latestOrder &&
+                String(latestOrder.id) ===
+                String(orderId)
+            ) {
+
+                localStorage.setItem(
+                    "latestOrder",
+                    JSON.stringify(
+                        updatedOrder
+                    )
+                );
+
+            }
+
+        }
+
+
+        /* =========================================
+           REFRESH WEBSITE
+        ========================================= */
+
+        await displayOrderDetails();
+
+        displayPurchaseHistory();
+
+        updateDashboard();
+
 
         alert(
-            "Order not found."
+            "Payment rejected successfully.\n\n" +
+            "Rejected By: Admin"
         );
 
-        return;
+    }
+    catch (error) {
+
+        console.error(
+            "Admin payment rejection error:",
+            error
+        );
+
+
+        if (
+            error.code ===
+            "permission-denied"
+        ) {
+
+            alert(
+                "Admin does not have permission to reject this payment."
+            );
+
+        }
+        else {
+
+            alert(
+                "Payment rejection failed.\n\n" +
+                error.message
+            );
+
+        }
+
     }
 
-
-    order =
-        orders[index];
-
-
-    /* =========================================
-       CHECK STATUS AGAIN
-    ========================================= */
-
-    if (
-        order.paymentStatus &&
-        order.paymentStatus !==
-            "Pending Verification"
-    ) {
-
-        alert(
-            "This payment has already been processed by another user.\n\n" +
-            "Current Status: " +
-            order.paymentStatus
-        );
-
-        displayOrderDetails();
-
-        return;
-    }
-
-
-    /* =========================================
-       REJECT PAYMENT
-    ========================================= */
-
-    order.paymentStatus =
-        "Rejected";
-
-
-    order.status =
-        "Payment Failed";
-
-
-    order.paymentRejectedDate =
-        new Date().toLocaleString();
-
-
-    /* =========================================
-       SAVE ADMIN AUDIT
-    ========================================= */
-
-    order.paymentRejectedByRole =
-        "Admin";
-
-   /* =========================================
-   SAVE ADMIN REJECTION TO FIRESTORE
-========================================= */
-
-try {
-
-    await db.collection("orders")
-        .doc(String(order.id))
-        .set(
-            order,
-            { merge: true }
-        );
-
-    console.log(
-        "Admin rejection saved to Firestore:",
-        order.id
-    );
-
-}
-catch (error) {
-
-    console.error(
-        "Error saving Admin rejection:",
-        error
-    );
-
-    alert(
-        "Payment rejection could not be saved online."
-    );
-
-    return;
-}
-
-
-    /* =========================================
-       SAVE ORDERS
-    ========================================= */
-
-    localStorage.setItem(
-        "orders",
-        JSON.stringify(orders)
-    );
-
-
-    /* =========================================
-       UPDATE LATEST ORDER
-    ========================================= */
-
-    const latestOrder =
-        JSON.parse(
-            localStorage.getItem(
-                "latestOrder"
-            ) || "null"
-        );
-
-
-    if (
-        latestOrder &&
-        String(latestOrder.id) ===
-        String(orderId)
-    ) {
-
-        latestOrder.paymentStatus =
-            "Rejected";
-
-
-        latestOrder.status =
-            "Payment Failed";
-
-
-        latestOrder.paymentRejectedDate =
-            order.paymentRejectedDate;
-
-
-        latestOrder.paymentRejectedByRole =
-            "Admin";
-
-
-        localStorage.setItem(
-            "latestOrder",
-            JSON.stringify(latestOrder)
-        );
-    }
-
-
-    /* =========================================
-       REFRESH WEBSITE
-    ========================================= */
-
-    displayOrderDetails();
-
-    displayPurchaseHistory();
-
-    updateDashboard();
-
-
-    alert(
-        "Payment rejected successfully!\n\n" +
-        "Rejected By: Admin"
-    );
 }
 
 /* =====================================================
