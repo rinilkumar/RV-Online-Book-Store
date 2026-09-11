@@ -8153,7 +8153,7 @@ function displayManagerStock() {
 
                 <button
                     type="button"
-                    onclick="updateManagerStock(${book.id})"
+                    onclick="updateManagerStock('${book.id}')"
                 >
                     Update Stock
                 </button>
@@ -8169,10 +8169,10 @@ function displayManagerStock() {
 }
 
 /* =====================================================
-   UPDATE STOCK - MANAGER
+   UPDATE STOCK - MANAGER - FIRESTORE
 ===================================================== */
 
-function updateManagerStock(bookId) {
+async function updateManagerStock(bookId) {
 
     /* =========================================
        CHECK MANAGER LOGIN
@@ -8180,9 +8180,13 @@ function updateManagerStock(bookId) {
 
     if (!isManagerLoggedIn()) {
 
-        alert("Manager login required.");
+        alert(
+            "Manager login required."
+        );
 
-        showPage("accountPage");
+        showPage(
+            "accountPage"
+        );
 
         showAccountForm(
             "managerLoginForm"
@@ -8192,179 +8196,258 @@ function updateManagerStock(bookId) {
     }
 
 
-    /* =========================================
-       GET CURRENT MANAGER
-    ========================================= */
-
-    const currentManager =
-        getCurrentManager();
+    const user =
+        auth.currentUser;
 
 
-    if (!currentManager) {
+    if (!user) {
 
-        alert("Manager session not found.");
+        alert(
+            "Manager Firebase session not found. Please login again."
+        );
 
         return;
     }
 
 
-    /* =========================================
-       CHECK LATEST ADMIN APPROVAL
-    ========================================= */
+    try {
 
-    const managers =
-        getManagers();
+        /* =========================================
+           GET LATEST MANAGER FROM FIRESTORE
+        ========================================= */
+
+        const managerDoc =
+            await db.collection("managers")
+                .doc(user.uid)
+                .get();
 
 
-    const manager =
-        managers.find(function (item) {
+        if (!managerDoc.exists) {
 
-            return (
-                item.managerId ===
-                currentManager.managerId
+            alert(
+                "Manager profile not found."
             );
+
+            return;
+        }
+
+
+        const manager =
+            managerDoc.data();
+
+
+        /* =========================================
+           CHECK ADMIN APPROVAL
+        ========================================= */
+
+        if (
+            manager.status !==
+            "Approved"
+        ) {
+
+            alert(
+                "Manager permission denied."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           GET STOCK INPUT
+        ========================================= */
+
+        const input =
+            document.getElementById(
+                "managerStock-" + bookId
+            );
+
+
+        if (!input) {
+
+            alert(
+                "Stock input not found."
+            );
+
+            return;
+        }
+
+
+        const newStock =
+            Number(input.value);
+
+
+        /* =========================================
+           VALIDATE STOCK
+        ========================================= */
+
+        if (
+            !Number.isInteger(newStock) ||
+            newStock < 0
+        ) {
+
+            alert(
+                "Please enter a valid stock quantity."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           GET BOOK FROM FIRESTORE
+        ========================================= */
+
+        const bookRef =
+            db.collection("books")
+                .doc(String(bookId));
+
+
+        const bookDoc =
+            await bookRef.get();
+
+
+        if (!bookDoc.exists) {
+
+            alert(
+                "Book not found in Firestore."
+            );
+
+            return;
+        }
+
+
+        const book =
+            bookDoc.data();
+
+
+        const oldStock =
+            Number(book.stock) || 0;
+
+
+        /* =========================================
+           UPDATE STOCK IN FIRESTORE
+        ========================================= */
+
+        await bookRef.update({
+
+            stock:
+                newStock
 
         });
 
 
-    if (
-        !manager ||
-        manager.status !== "Approved"
-    ) {
+        console.log(
+            "Manager updated Firestore stock:",
+            {
+                bookId:
+                    bookId,
 
-        localStorage.removeItem(
-            "currentManager"
-        );
+                oldStock:
+                    oldStock,
 
-        localStorage.removeItem(
-            "managerLoggedIn"
-        );
+                newStock:
+                    newStock,
 
-
-        updateNavigation();
-
-
-        alert(
-            "Manager permission denied."
+                managerId:
+                    manager.managerId
+            }
         );
 
 
-        showPage("home");
+        /* =========================================
+           UPDATE LOCAL BOOK CACHE
+        ========================================= */
 
-        return;
-    }
-
-
-    /* =========================================
-       GET STOCK INPUT
-    ========================================= */
-
-    const input =
-        document.getElementById(
-            "managerStock-" + bookId
-        );
+        let books =
+            getBooks();
 
 
-    if (!input) {
+        const index =
+            books.findIndex(
+                function (item) {
 
-        alert("Stock input not found.");
-
-        return;
-    }
-
-
-    const newStock =
-        Number(input.value);
-
-
-    /* =========================================
-       VALIDATE STOCK
-    ========================================= */
-
-    if (
-        !Number.isInteger(newStock) ||
-        newStock < 0
-    ) {
-
-        alert(
-            "Please enter a valid stock quantity."
-        );
-
-        return;
-    }
-
-
-    /* =========================================
-       FIND BOOK
-    ========================================= */
-
-    let books =
-        getBooks();
-
-
-    const book =
-        books.find(function (item) {
-
-            return (
-                String(item.id) ===
-                String(bookId)
+                    return (
+                        String(item.id) ===
+                        String(bookId)
+                    );
+                }
             );
 
-        });
+
+        if (index >= 0) {
+
+            books[index].stock =
+                newStock;
 
 
-    if (!book) {
+            localStorage.setItem(
+                "books",
+                JSON.stringify(
+                    books
+                )
+            );
+        }
 
-        alert("Book not found.");
 
-        return;
+        /* =========================================
+           REFRESH WEBSITE
+        ========================================= */
+
+        displayManagerStock();
+
+        displayBooks();
+
+        displayAdminBooks();
+
+        updateDashboard();
+
+
+        alert(
+            "Stock updated successfully.\n\n" +
+            "Book: " +
+            book.title +
+            "\nOld Stock: " +
+            oldStock +
+            "\nNew Stock: " +
+            newStock
+        );
+
+
+        /*
+           Reload latest Firestore data
+           after stock update.
+        */
+
+        await loadManagerDashboard();
+
     }
+    catch (error) {
+
+        console.error(
+            "Manager stock update error:",
+            error
+        );
 
 
-    const oldStock =
-        Number(book.stock) || 0;
+        if (
+            error.code ===
+            "permission-denied"
+        ) {
 
+            alert(
+                "Manager does not have permission to update stock."
+            );
 
-    /* =========================================
-       UPDATE STOCK
-    ========================================= */
+        }
+        else {
 
-    book.stock =
-        newStock;
-
-
-    localStorage.setItem(
-        "books",
-        JSON.stringify(books)
-    );
-
-
-    /* =========================================
-       REFRESH WEBSITE
-    ========================================= */
-
-    displayManagerStock();
-
-    displayBooks();
-
-    displayAdminBooks();
-
-    updateDashboard();
-
-    loadManagerDashboard();
-
-
-    alert(
-        "Stock updated successfully.\n\n" +
-        "Book: " +
-        book.title +
-        "\n" +
-        "Old Stock: " +
-        oldStock +
-        "\n" +
-        "New Stock: " +
-        newStock
-    );
+            alert(
+                "Stock could not be updated.\n\n" +
+                error.message
+            );
+        }
+    }
 }
 
 /* =====================================================
