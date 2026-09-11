@@ -12145,24 +12145,16 @@ function validateOrderStock(
 
 
 /* =====================================================
-   CONFIRM CASH ON DELIVERY ORDER - ADMIN
+   CONFIRM COD ORDER - ADMIN - ATOMIC TRANSACTION
 ===================================================== */
 
 async function confirmCODOrder(orderId) {
 
-    /* =========================================
-       ADMIN CHECK
-    ========================================= */
-
     if (!isAdminLoggedIn()) {
 
-        alert(
-            "Admin permission required."
-        );
+        alert("Admin permission required.");
 
-        showPage(
-            "accountPage"
-        );
+        showPage("accountPage");
 
         showAccountForm(
             "adminLoginForm"
@@ -12172,208 +12164,249 @@ async function confirmCODOrder(orderId) {
     }
 
 
-    try {
+    const confirmed =
+        confirm(
+            "Confirm this Cash on Delivery order?"
+        );
 
-        /* =========================================
-           LOAD FRESH ORDER FROM FIRESTORE
-        ========================================= */
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    try {
 
         const orderRef =
             db.collection("orders")
                 .doc(String(orderId));
 
 
-        const orderDoc =
-            await orderRef.get();
+        const confirmedDate =
+            new Date()
+                .toLocaleString();
 
 
-        if (!orderDoc.exists) {
+        await db.runTransaction(
+            async function (transaction) {
 
-            alert(
-                "Order not found."
-            );
+                /* ================================
+                   READ ORDER
+                ================================ */
 
-            return;
-        }
-
-
-        const order = {
-
-            ...orderDoc.data(),
-
-            id:
-                orderDoc.data().id ||
-                orderDoc.id
-
-        };
+                const orderDoc =
+                    await transaction.get(
+                        orderRef
+                    );
 
 
-        /* =========================================
-           CHECK PAYMENT METHOD
-        ========================================= */
+                if (!orderDoc.exists) {
 
-        if (
-            order.paymentMethod !==
-            "Cash on Delivery"
-        ) {
-
-            alert(
-                "This is not a Cash on Delivery order."
-            );
-
-            return;
-        }
+                    throw new Error(
+                        "Order not found."
+                    );
+                }
 
 
-        /* =========================================
-           CHECK ALREADY CONFIRMED
-        ========================================= */
-
-        if (
-            order.stockReduced === true ||
-            order.status ===
-                "Order Confirmed"
-        ) {
-
-            alert(
-                "This order has already been confirmed."
-            );
-
-            return;
-        }
+                const order =
+                    orderDoc.data();
 
 
-        /* =========================================
-           ADMIN CONFIRMATION
-        ========================================= */
+                /* ================================
+                   CHECK COD
+                ================================ */
 
-        const confirmed =
-            confirm(
+                if (
+                    order.paymentMethod !==
+                    "Cash on Delivery"
+                ) {
 
-                "Confirm this Cash on Delivery order?\n\n" +
-
-                "Order: " +
-                order.id +
-
-                "\nCustomer: " +
-                order.customer +
-
-                "\nAmount: ₹" +
-                order.total
-
-            );
+                    throw new Error(
+                        "This is not a Cash on Delivery order."
+                    );
+                }
 
 
-        if (!confirmed) {
-            return;
-        }
+                /* ================================
+                   CHECK ORDER STILL PENDING
+                ================================ */
+
+                if (
+                    order.stockReduced === true ||
+                    order.status !==
+                    "Awaiting Admin Confirmation"
+                ) {
+
+                    throw new Error(
+                        "This order has already been processed."
+                    );
+                }
 
 
-        /* =========================================
-           REDUCE STOCK
-        ========================================= */
+                if (
+                    !Array.isArray(order.books) ||
+                    order.books.length === 0
+                ) {
 
-        const stockUpdated =
-            await reducePurchasedStock(
-                order.books
-            );
-
-
-        if (!stockUpdated) {
-
-            return;
-        }
+                    throw new Error(
+                        "No books found in this order."
+                    );
+                }
 
 
-        /* =========================================
-           UPDATE ORDER
-        ========================================= */
+                /* ================================
+                   READ ALL BOOKS FIRST
+                ================================ */
 
-        await orderRef.set(
-            {
+                const stockUpdates = [];
 
-                stockReduced:
-                    true,
 
-                status:
-                    "Order Confirmed",
+                for (
+                    const orderBook
+                    of order.books
+                ) {
 
-                codConfirmedDate:
-                    new Date()
-                        .toLocaleString(),
+                    const bookRef =
+                        db.collection("books")
+                            .doc(
+                                String(
+                                    orderBook.id
+                                )
+                            );
 
-                codConfirmedByRole:
-                    "Admin"
 
-            },
+                    const bookDoc =
+                        await transaction.get(
+                            bookRef
+                        );
 
-            {
-                merge:
-                    true
+
+                    if (!bookDoc.exists) {
+
+                        throw new Error(
+                            orderBook.title +
+                            " is no longer available."
+                        );
+                    }
+
+
+                    const book =
+                        bookDoc.data();
+
+
+                    const currentStock =
+                        Number(
+                            book.stock
+                        ) || 0;
+
+
+                    const quantity =
+                        Number(
+                            orderBook.quantity
+                        ) || 1;
+
+
+                    if (
+                        !Number.isInteger(quantity) ||
+                        quantity <= 0
+                    ) {
+
+                        throw new Error(
+                            "Invalid quantity for " +
+                            orderBook.title
+                        );
+                    }
+
+
+                    if (
+                        quantity >
+                        currentStock
+                    ) {
+
+                        throw new Error(
+                            "Not enough stock for " +
+                            orderBook.title +
+                            ". Available: " +
+                            currentStock
+                        );
+                    }
+
+
+                    stockUpdates.push({
+
+                        ref:
+                            bookRef,
+
+                        newStock:
+                            currentStock -
+                            quantity
+
+                    });
+                }
+
+
+                /* ================================
+                   UPDATE ALL BOOK STOCK
+                ================================ */
+
+                stockUpdates.forEach(
+                    function (item) {
+
+                        transaction.update(
+                            item.ref,
+                            {
+                                stock:
+                                    item.newStock
+                            }
+                        );
+
+                    }
+                );
+
+
+                /* ================================
+                   CONFIRM ORDER
+                   SAME TRANSACTION
+                ================================ */
+
+                transaction.update(
+                    orderRef,
+                    {
+
+                        stockReduced:
+                            true,
+
+                        status:
+                            "Order Confirmed",
+
+                        codConfirmedDate:
+                            confirmedDate,
+
+                        codConfirmedByRole:
+                            "Admin"
+
+                    }
+                );
+
             }
         );
 
 
         console.log(
-            "COD order confirmed:",
-            order.id
+            "COD order and stock updated atomically:",
+            orderId
         );
 
 
-        /* =========================================
-           UPDATE LOCAL ORDER CACHE
-        ========================================= */
+        /* ================================
+           RELOAD FRESH FIRESTORE DATA
+        ================================ */
 
-        let orders =
-            getOrders();
-
-
-        const index =
-            orders.findIndex(
-                function (item) {
-
-                    return (
-                        String(item.id) ===
-                        String(orderId)
-                    );
-                }
-            );
-
-
-        if (index >= 0) {
-
-            orders[index].stockReduced =
-                true;
-
-            orders[index].status =
-                "Order Confirmed";
-
-            orders[index].codConfirmedDate =
-                new Date()
-                    .toLocaleString();
-
-            orders[index].codConfirmedByRole =
-                "Admin";
-
-
-            localStorage.setItem(
-                "orders",
-                JSON.stringify(
-                    orders
-                )
-            );
-        }
-
-
-        /* =========================================
-           REFRESH
-        ========================================= */
+        await displayBooks();
 
         await displayOrderDetails();
 
         displayPurchaseHistory();
-
-        displayBooks();
 
         displayBookDetails();
 
@@ -12402,10 +12435,14 @@ async function confirmCODOrder(orderId) {
 
 
 
+/* =====================================================
+   VERIFY UPI PAYMENT - ADMIN - ATOMIC TRANSACTION
+===================================================== */
+
 async function verifyOrderPayment(orderId) {
 
     /* =========================================
-       ADMIN LOGIN CHECK
+       ADMIN CHECK
     ========================================= */
 
     if (!isAdminLoggedIn()) {
@@ -12414,7 +12451,9 @@ async function verifyOrderPayment(orderId) {
             "Admin permission required."
         );
 
-        showPage("accountPage");
+        showPage(
+            "accountPage"
+        );
 
         showAccountForm(
             "adminLoginForm"
@@ -12424,87 +12463,9 @@ async function verifyOrderPayment(orderId) {
     }
 
 
-    /* =========================================
-       GET CURRENT ORDER
-    ========================================= */
-
-    let orders = getOrders();
-
-    let index =
-        orders.findIndex(
-            function (order) {
-
-                return (
-                    String(order.id) ===
-                    String(orderId)
-                );
-            }
-        );
-
-
-    if (index === -1) {
-
-        alert(
-            "Order not found."
-        );
-
-        return;
-    }
-
-
-    let order =
-        orders[index];
-
-
-    /* =========================================
-       UPI PAYMENT CHECK
-    ========================================= */
-
-    if (order.paymentMethod !== "UPI") {
-
-        alert(
-            "This is not a UPI payment."
-        );
-
-        return;
-    }
-
-
-    /* =========================================
-       CHECK PAYMENT IS STILL PENDING
-    ========================================= */
-
-    if (
-        order.paymentStatus &&
-        order.paymentStatus !==
-            "Pending Verification"
-    ) {
-
-        alert(
-            "This payment has already been processed.\n\n" +
-            "Current Status: " +
-            order.paymentStatus
-        );
-
-        displayOrderDetails();
-
-        return;
-    }
-
-
-    /* =========================================
-       ADMIN CONFIRMATION
-    ========================================= */
-
     const confirmed =
         confirm(
-            "Verify this customer payment?\n\n" +
-            "Order: " +
-            order.id +
-            "\nTransaction ID: " +
-            (order.transactionId || "-") +
-            "\nAmount: ₹" +
-            order.total
+            "Verify this customer UPI payment?"
         );
 
 
@@ -12513,234 +12474,376 @@ async function verifyOrderPayment(orderId) {
     }
 
 
-    /* =========================================
-       GET FRESH ORDER DATA AGAIN
+    try {
 
-       Important:
-       Manager may have processed this payment
-       while Admin confirmation was open.
-    ========================================= */
-
-    orders = getOrders();
+        const orderRef =
+            db.collection("orders")
+                .doc(String(orderId));
 
 
-    index =
-        orders.findIndex(
-            function (item) {
+        const verifiedDate =
+            new Date()
+                .toLocaleString();
 
-                return (
-                    String(item.id) ===
-                    String(orderId)
+
+        /* =========================================
+           FIRESTORE TRANSACTION
+        ========================================= */
+
+        await db.runTransaction(
+            async function (transaction) {
+
+                /* =================================
+                   GET FRESH ORDER
+                ================================= */
+
+                const orderDoc =
+                    await transaction.get(
+                        orderRef
+                    );
+
+
+                if (!orderDoc.exists) {
+
+                    throw new Error(
+                        "Order not found."
+                    );
+                }
+
+
+                const order =
+                    orderDoc.data();
+
+
+                /* =================================
+                   CHECK UPI PAYMENT
+                ================================= */
+
+                if (
+                    order.paymentMethod !==
+                    "UPI"
+                ) {
+
+                    throw new Error(
+                        "This is not a UPI payment."
+                    );
+                }
+
+
+                /* =================================
+                   CHECK PAYMENT STILL PENDING
+                ================================= */
+
+                if (
+                    order.paymentStatus !==
+                    "Pending Verification"
+                ) {
+
+                    throw new Error(
+                        "This payment has already been processed."
+                    );
+                }
+
+
+                if (
+                    order.stockReduced === true
+                ) {
+
+                    throw new Error(
+                        "Stock has already been reduced for this order."
+                    );
+                }
+
+
+                if (
+                    !Array.isArray(
+                        order.books
+                    ) ||
+                    order.books.length === 0
+                ) {
+
+                    throw new Error(
+                        "No books found in this order."
+                    );
+                }
+
+
+                /* =================================
+                   READ ALL BOOKS
+                ================================= */
+
+                const stockUpdates = [];
+
+
+                for (
+                    const orderBook
+                    of order.books
+                ) {
+
+                    const bookRef =
+                        db.collection("books")
+                            .doc(
+                                String(
+                                    orderBook.id
+                                )
+                            );
+
+
+                    const bookDoc =
+                        await transaction.get(
+                            bookRef
+                        );
+
+
+                    if (!bookDoc.exists) {
+
+                        throw new Error(
+                            orderBook.title +
+                            " is no longer available."
+                        );
+                    }
+
+
+                    const book =
+                        bookDoc.data();
+
+
+                    const currentStock =
+                        Number(
+                            book.stock
+                        ) || 0;
+
+
+                    const quantity =
+                        Number(
+                            orderBook.quantity
+                        ) || 1;
+
+
+                    if (
+                        !Number.isInteger(
+                            quantity
+                        ) ||
+                        quantity <= 0
+                    ) {
+
+                        throw new Error(
+                            "Invalid quantity for " +
+                            orderBook.title
+                        );
+                    }
+
+
+                    if (
+                        quantity >
+                        currentStock
+                    ) {
+
+                        throw new Error(
+                            "Not enough stock for " +
+                            orderBook.title +
+                            ". Available: " +
+                            currentStock
+                        );
+                    }
+
+
+                    stockUpdates.push({
+
+                        ref:
+                            bookRef,
+
+                        newStock:
+                            currentStock -
+                            quantity
+
+                    });
+
+                }
+
+
+                /* =================================
+                   REDUCE BOOK STOCK
+                ================================= */
+
+                stockUpdates.forEach(
+                    function (item) {
+
+                        transaction.update(
+                            item.ref,
+                            {
+
+                                stock:
+                                    item.newStock
+
+                            }
+                        );
+
+                    }
                 );
+
+
+                /* =================================
+                   VERIFY ORDER
+                ================================= */
+
+                transaction.update(
+                    orderRef,
+                    {
+
+                        paymentStatus:
+                            "Verified",
+
+                        status:
+                            "Order Confirmed",
+
+                        stockReduced:
+                            true,
+
+                        paymentVerifiedDate:
+                            verifiedDate,
+
+                        paymentVerifiedByRole:
+                            "Admin"
+
+                    }
+                );
+
             }
         );
 
 
-    if (index === -1) {
-
-        alert(
-            "Order not found."
+        console.log(
+            "Admin UPI payment verified atomically:",
+            orderId
         );
 
-        return;
-    }
+
+        /* =========================================
+           GET UPDATED ORDER
+        ========================================= */
+
+        const updatedDoc =
+            await orderRef.get();
 
 
-    order =
-        orders[index];
+        const updatedOrder =
+            updatedDoc.exists
+                ? {
+                    ...updatedDoc.data(),
+
+                    id:
+                        updatedDoc.data().id ||
+                        updatedDoc.id
+                }
+                : null;
 
 
-    /* =========================================
-       CHECK AGAIN AFTER READING FRESH DATA
-    ========================================= */
+        /* =========================================
+           UPDATE LOCAL ORDER CACHE
+        ========================================= */
 
-    if (
-        order.paymentStatus &&
-        order.paymentStatus !==
-            "Pending Verification"
-    ) {
+        if (updatedOrder) {
 
-        alert(
-            "This payment has already been processed by another user.\n\n" +
-            "Current Status: " +
-            order.paymentStatus
-        );
-
-        displayOrderDetails();
-
-        return;
-    }
+            let orders =
+                getOrders();
 
 
-    /* =========================================
-       STOCK REDUCTION
+            const index =
+                orders.findIndex(
+                    function (order) {
 
-       Reduce only once.
-    ========================================= */
+                        return (
+                            String(order.id) ===
+                            String(orderId)
+                        );
+                    }
+                );
 
-    if (!order.stockReduced) {
 
-        if (
-            !validateOrderStock(
-                order.books
-            )
-        ) {
+            if (index >= 0) {
 
-            alert(
-                "Payment was found, but the order cannot be confirmed because there is not enough stock."
+                orders[index] =
+                    updatedOrder;
+
+            }
+            else {
+
+                orders.push(
+                    updatedOrder
+                );
+
+            }
+
+
+            localStorage.setItem(
+                "orders",
+                JSON.stringify(
+                    orders
+                )
             );
 
-            return;
+
+            const latestOrder =
+                JSON.parse(
+                    localStorage.getItem(
+                        "latestOrder"
+                    ) || "null"
+                );
+
+
+            if (
+                latestOrder &&
+                String(latestOrder.id) ===
+                String(orderId)
+            ) {
+
+                localStorage.setItem(
+                    "latestOrder",
+                    JSON.stringify(
+                        updatedOrder
+                    )
+                );
+            }
         }
 
 
-       const stockUpdated =
-    await reducePurchasedStock(
-        order.books
-    );
+        /* =========================================
+           REFRESH WEBSITE
+        ========================================= */
 
-if (!stockUpdated) {
-    return;
-}
-      
+        await displayBooks();
 
-order.stockReduced =
-    true;
+        await displayOrderDetails();
+
+        displayPurchaseHistory();
+
+        displayCart();
+
+        displayBookDetails();
+
+        updateDashboard();
+
+
+        alert(
+            "Payment verified successfully!\n\n" +
+            "Verified By: Admin"
+        );
+
     }
+    catch (error) {
 
-    /* =========================================
-       VERIFY PAYMENT
-    ========================================= */
-
-    order.paymentStatus =
-        "Verified";
-
-
-    order.status =
-        "Order Confirmed";
-
-
-    order.paymentVerifiedDate =
-        new Date().toLocaleString();
-
-
-    /* =========================================
-       SAVE ADMIN AUDIT
-    ========================================= */
-
-    order.paymentVerifiedByRole =
-        "Admin";
-
-       /* =========================================
-   SAVE ADMIN VERIFICATION TO FIRESTORE
-========================================= */
-
-try {
-
-    await db.collection("orders")
-        .doc(String(order.id))
-        .set(
-            order,
-            { merge: true }
-        );
-
-    console.log(
-        "Admin verification saved to Firestore:",
-        order.id
-    );
-
-}
-catch (error) {
-
-    console.error(
-        "Error saving Admin verification:",
-        error
-    );
-
-    alert(
-        "Payment verification could not be saved online."
-    );
-
-    return;
-}
-
-
-    /* =========================================
-       SAVE ORDERS
-    ========================================= */
-
-    localStorage.setItem(
-        "orders",
-        JSON.stringify(orders)
-    );
-
-
-    /* =========================================
-       UPDATE LATEST ORDER
-    ========================================= */
-
-    const latestOrder =
-        JSON.parse(
-            localStorage.getItem(
-                "latestOrder"
-            ) || "null"
+        console.error(
+            "Admin UPI verification error:",
+            error
         );
 
 
-    if (
-        latestOrder &&
-        String(latestOrder.id) ===
-        String(orderId)
-    ) {
-
-        latestOrder.paymentStatus =
-            "Verified";
-
-
-        latestOrder.status =
-            "Order Confirmed";
-
-
-        latestOrder.stockReduced =
-            order.stockReduced;
-
-
-        latestOrder.paymentVerifiedDate =
-            order.paymentVerifiedDate;
-
-
-        latestOrder.paymentVerifiedByRole =
-            "Admin";
-
-
-        localStorage.setItem(
-            "latestOrder",
-            JSON.stringify(latestOrder)
+        alert(
+            "Payment verification failed.\n\n" +
+            error.message
         );
     }
-
-
-    /* =========================================
-       REFRESH WEBSITE
-    ========================================= */
-
-    displayOrderDetails();
-
-    displayPurchaseHistory();
-
-    displayBooks();
-
-    displayCart();
-
-    displayBookDetails();
-
-    updateDashboard();
-
-
-    alert(
-        "Payment verified successfully!\n\n" +
-        "Verified By: Admin"
-    );
 }
 
 async function rejectOrderPayment(orderId) {
