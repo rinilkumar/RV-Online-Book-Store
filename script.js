@@ -5878,14 +5878,16 @@ function setText(id, value) {
     }
 }
 /* =====================================================
-   LOAD MANAGER DASHBOARD
+   LOAD MANAGER DASHBOARD - FIRESTORE
 ===================================================== */
 
-function loadManagerDashboard() {
+async function loadManagerDashboard() {
 
-    // Get currently logged-in Manager
     const currentManager =
         getCurrentManager();
+
+    const user =
+        auth.currentUser;
 
 
     /* =========================================
@@ -5894,12 +5896,17 @@ function loadManagerDashboard() {
 
     if (
         !currentManager ||
-        !isManagerLoggedIn()
+        !isManagerLoggedIn() ||
+        !user
     ) {
 
-        alert("Manager login required.");
+        alert(
+            "Manager login required."
+        );
 
-        showPage("accountPage");
+        showPage(
+            "accountPage"
+        );
 
         showAccountForm(
             "managerLoginForm"
@@ -5909,216 +5916,391 @@ function loadManagerDashboard() {
     }
 
 
-    /* =========================================
-       GET LATEST MANAGER INFORMATION
-    ========================================= */
+    try {
 
-    const managers =
-        getManagers();
+        /* =========================================
+           GET MANAGER FROM FIRESTORE
+        ========================================= */
+
+        const managerDoc =
+            await db.collection("managers")
+                .doc(user.uid)
+                .get();
 
 
-    const manager =
-        managers.find(function (item) {
+        if (!managerDoc.exists) {
 
-            return (
-                item.managerId ===
-                currentManager.managerId
+            localStorage.removeItem(
+                "currentManager"
             );
 
-        });
+            localStorage.removeItem(
+                "managerLoggedIn"
+            );
+
+            await auth.signOut();
+
+            updateNavigation();
+
+            showPage("home");
+
+            alert(
+                "Manager account was not found."
+            );
+
+            return;
+        }
 
 
-    /* =========================================
-       CHECK WHETHER MANAGER STILL EXISTS
-    ========================================= */
+        const manager = {
 
-    if (!manager) {
+            ...managerDoc.data(),
 
-        localStorage.removeItem(
-            "currentManager"
+            uid:
+                managerDoc.id
+        };
+
+
+        /* =========================================
+           CHECK MANAGER STATUS
+        ========================================= */
+
+        if (
+            manager.status !==
+            "Approved"
+        ) {
+
+            localStorage.removeItem(
+                "currentManager"
+            );
+
+            localStorage.removeItem(
+                "managerLoggedIn"
+            );
+
+            await auth.signOut();
+
+            updateNavigation();
+
+            showPage("home");
+
+            alert(
+                "Your Manager access is not active."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           UPDATE CURRENT MANAGER CACHE
+        ========================================= */
+
+        localStorage.setItem(
+            "currentManager",
+            JSON.stringify(manager)
         );
 
-        localStorage.removeItem(
-            "managerLoggedIn"
+
+        /* =========================================
+           LOAD STORE DATA FROM FIRESTORE
+        ========================================= */
+
+        const results =
+            await Promise.all([
+
+                db.collection("books")
+                    .get(),
+
+                db.collection("customers")
+                    .get(),
+
+                db.collection("orders")
+                    .get()
+
+            ]);
+
+
+        const booksSnapshot =
+            results[0];
+
+        const customersSnapshot =
+            results[1];
+
+        const ordersSnapshot =
+            results[2];
+
+
+        const books = [];
+
+        const customers = [];
+
+        const orders = [];
+
+
+        /* =========================================
+           BUILD BOOK ARRAY
+        ========================================= */
+
+        booksSnapshot.forEach(
+            function (doc) {
+
+                const data =
+                    doc.data();
+
+                books.push({
+
+                    ...data,
+
+                    id:
+                        data.id !== undefined
+                            ? data.id
+                            : doc.id
+
+                });
+            }
         );
+
+
+        /* =========================================
+           BUILD CUSTOMER ARRAY
+        ========================================= */
+
+        customersSnapshot.forEach(
+            function (doc) {
+
+                const data =
+                    doc.data();
+
+                customers.push({
+
+                    ...data,
+
+                    id:
+                        data.id !== undefined
+                            ? data.id
+                            : doc.id
+
+                });
+            }
+        );
+
+
+        /* =========================================
+           BUILD ORDER ARRAY
+        ========================================= */
+
+        ordersSnapshot.forEach(
+            function (doc) {
+
+                const data =
+                    doc.data();
+
+                orders.push({
+
+                    ...data,
+
+                    id:
+                        data.id !== undefined
+                            ? data.id
+                            : doc.id
+
+                });
+            }
+        );
+
+
+        /* =========================================
+           UPDATE LOCAL CACHE
+           Existing Manager sections still use it.
+        ========================================= */
+
+        localStorage.setItem(
+            "books",
+            JSON.stringify(books)
+        );
+
+        localStorage.setItem(
+            "customers",
+            JSON.stringify(customers)
+        );
+
+        localStorage.setItem(
+            "orders",
+            JSON.stringify(orders)
+        );
+
+
+        console.log(
+            "Manager Dashboard loaded from Firestore:",
+            {
+                books:
+                    books.length,
+
+                customers:
+                    customers.length,
+
+                orders:
+                    orders.length
+            }
+        );
+
+
+        /* =========================================
+           CALCULATE TOTAL STOCK
+        ========================================= */
+
+        const totalStock =
+            books.reduce(
+
+                function (
+                    total,
+                    book
+                ) {
+
+                    return (
+                        total +
+                        Number(
+                            book.stock || 0
+                        )
+                    );
+                },
+
+                0
+            );
+
+
+        /* =========================================
+           UPDATE DASHBOARD CARDS
+        ========================================= */
+
+        setText(
+            "managerTotalBooks",
+            books.length
+        );
+
+
+        setText(
+            "managerTotalStock",
+            totalStock
+        );
+
+
+        setText(
+            "managerTotalCustomers",
+            customers.length
+        );
+
+
+        setText(
+            "managerTotalOrders",
+            orders.length
+        );
+
+
+        /* =========================================
+           MANAGER WELCOME MESSAGE
+        ========================================= */
+
+        const welcome =
+            document.getElementById(
+                "managerWelcome"
+            );
+
+
+        if (welcome) {
+
+            welcome.textContent =
+                "Welcome " +
+                manager.name +
+                " (" +
+                manager.managerId +
+                ") - Manage stock and customer activity.";
+        }
+
+
+        /* =========================================
+           LOAD MANAGER STOCK
+        ========================================= */
+
+        displayManagerStock();
+
+
+        /* =========================================
+           LOAD CUSTOMER ACTIVITY
+        ========================================= */
+
+        displayManagerCustomerActivity();
+
+
+        /* =========================================
+           PAYMENT VERIFICATION PERMISSION
+        ========================================= */
+
+        const paymentPermissionCard =
+            document.getElementById(
+                "managerPaymentPermissionCard"
+            );
+
+
+        const paymentVerificationSection =
+            document.getElementById(
+                "managerPaymentVerification"
+            );
+
+
+        if (
+            managerCanVerifyPayments()
+        ) {
+
+            if (
+                paymentPermissionCard
+            ) {
+
+                paymentPermissionCard
+                    .style
+                    .display =
+                    "block";
+            }
+
+        }
+        else {
+
+            if (
+                paymentPermissionCard
+            ) {
+
+                paymentPermissionCard
+                    .style
+                    .display =
+                    "none";
+            }
+
+
+            if (
+                paymentVerificationSection
+            ) {
+
+                paymentVerificationSection
+                    .style
+                    .display =
+                    "none";
+            }
+        }
+
+    }
+    catch (error) {
+
+        console.error(
+            "Manager Dashboard Firestore error:",
+            error
+        );
+
 
         alert(
-            "Manager account was not found."
+            "Manager Dashboard data could not be loaded."
         );
-
-        updateNavigation();
-
-        showPage("home");
-
-        return;
     }
-
-
-    /* =========================================
-       CHECK ADMIN APPROVAL
-    ========================================= */
-
-    if (manager.status !== "Approved") {
-
-        localStorage.removeItem(
-            "currentManager"
-        );
-
-        localStorage.removeItem(
-            "managerLoggedIn"
-        );
-
-        alert(
-            "Your Manager access is not active."
-        );
-
-        updateNavigation();
-
-        showPage("home");
-
-        return;
-    }
-
-
-    /* =========================================
-       GET STORE DATA
-    ========================================= */
-
-    const books =
-        getBooks();
-
-    const customers =
-        getCustomers();
-
-    const orders =
-        getOrders();
-
-
-    /* =========================================
-       CALCULATE TOTAL STOCK
-    ========================================= */
-
-    const totalStock =
-        books.reduce(
-            function (total, book) {
-
-                return (
-                    total +
-                    Number(book.stock || 0)
-                );
-
-            },
-            0
-        );
-
-
-    /* =========================================
-       UPDATE MANAGER DASHBOARD CARDS
-    ========================================= */
-
-    setText(
-        "managerTotalBooks",
-        books.length
-    );
-
-
-    setText(
-        "managerTotalStock",
-        totalStock
-    );
-
-
-    setText(
-        "managerTotalCustomers",
-        customers.length
-    );
-
-
-    setText(
-        "managerTotalOrders",
-        orders.length
-    );
-
-
-    /* =========================================
-       DISPLAY MANAGER NAME + ID
-    ========================================= */
-
-    const welcome =
-        document.getElementById(
-            "managerWelcome"
-        );
-
-
-    if (welcome) {
-
-        welcome.textContent =
-            "Welcome " +
-            manager.name +
-            " (" +
-            manager.managerId +
-            ") - Manage stock and customer activity.";
-
-    }
-
-
-    /* =========================================
-       LOAD STOCK SECTION
-    ========================================= */
-
-    displayManagerStock();
-
-
-    /* =========================================
-       LOAD CUSTOMER ACTIVITY
-    ========================================= */
-
-    displayManagerCustomerActivity();
-
-    /* =========================================
-   PAYMENT VERIFICATION PERMISSION
-========================================= */
-
-const paymentPermissionCard =
-    document.getElementById(
-        "managerPaymentPermissionCard"
-    );
-
-const paymentVerificationSection =
-    document.getElementById(
-        "managerPaymentVerification"
-    );
-
-
-if (managerCanVerifyPayments()) {
-
-    /* SHOW PAYMENT CARD */
-
-    if (paymentPermissionCard) {
-
-        paymentPermissionCard.style.display =
-            "block";
-    }
-
-} else {
-
-    /* HIDE PAYMENT CARD */
-
-    if (paymentPermissionCard) {
-
-        paymentPermissionCard.style.display =
-            "none";
-    }
-
-
-    /* CLOSE PAYMENT VERIFICATION SECTION */
-
-    if (paymentVerificationSection) {
-
-        paymentVerificationSection.style.display =
-            "none";
-    }
-}
 }
 
 /* =====================================================
@@ -11788,66 +11970,7 @@ async function loadSubcategoriesFromFirestore() {
     }
 }
 
-/* =====================================================
-   RESTORE FIREBASE CUSTOMER SESSION
-===================================================== */
 
-function restoreCustomerSession() {
-
-    auth.onAuthStateChanged(
-        async function (user) {
-
-            if (user) {
-
-                try {
-
-                    const customerDoc =
-                        await db
-                            .collection("customers")
-                            .doc(user.uid)
-                            .get();
-
-
-                    if (customerDoc.exists) {
-
-                        const customer =
-                            customerDoc.data();
-
-
-                        localStorage.setItem(
-                            "currentCustomer",
-                            JSON.stringify(customer)
-                        );
-
-
-                        updateNavigation();
-
-                    }
-
-                }
-                catch (error) {
-
-                    console.error(
-                        "Session restore error:",
-                        error
-                    );
-
-                }
-
-            }
-            else {
-
-                localStorage.removeItem(
-                    "currentCustomer"
-                );
-
-                updateNavigation();
-
-            }
-
-        }
-    );
-}
 
 /* =====================================================
    LOAD CATEGORIES FROM FIRESTORE
@@ -11896,7 +12019,7 @@ async function loadCategoriesFromFirestore() {
 
 
 /* =====================================================
-   RESTORE CUSTOMER SESSION
+   RESTORE CUSTOMER FIREBASE SESSION
 ===================================================== */
 
 function restoreCustomerSession() {
@@ -11904,50 +12027,7 @@ function restoreCustomerSession() {
     auth.onAuthStateChanged(
         async function (user) {
 
-            if (user) {
-
-                try {
-
-                    const customerDoc =
-                        await db.collection("customers")
-                            .doc(user.uid)
-                            .get();
-
-
-                    if (customerDoc.exists) {
-
-                        const customer =
-                            customerDoc.data();
-
-
-                        localStorage.setItem(
-                            "currentCustomer",
-                            JSON.stringify(customer)
-                        );
-
-
-                        console.log(
-                            "Customer session restored:",
-                            customer
-                        );
-
-
-                        updateNavigation();
-
-                    }
-
-                }
-                catch (error) {
-
-                    console.error(
-                        "Session restore error:",
-                        error
-                    );
-
-                }
-
-            }
-            else {
+            if (!user) {
 
                 localStorage.removeItem(
                     "currentCustomer"
@@ -11955,12 +12035,78 @@ function restoreCustomerSession() {
 
                 updateNavigation();
 
+                return;
             }
 
+
+            try {
+
+                const customerDoc =
+                    await db.collection("customers")
+                        .doc(user.uid)
+                        .get();
+
+
+                /* =====================================
+                   AUTH USER IS A CUSTOMER
+                ===================================== */
+
+                if (customerDoc.exists) {
+
+                    const customer = {
+
+                        ...customerDoc.data(),
+
+                        id:
+                            customerDoc.data().id ||
+                            user.uid
+                    };
+
+
+                    localStorage.setItem(
+                        "currentCustomer",
+                        JSON.stringify(customer)
+                    );
+
+
+                    console.log(
+                        "Customer session restored:",
+                        customer
+                    );
+
+
+                    updateNavigation();
+
+                    return;
+                }
+
+
+                /*
+                   Firebase user may be a Manager,
+                   not a Customer.
+
+                   Prevent an old Customer profile
+                   remaining in localStorage.
+                */
+
+                localStorage.removeItem(
+                    "currentCustomer"
+                );
+
+
+                updateNavigation();
+
+            }
+            catch (error) {
+
+                console.error(
+                    "Customer session restore error:",
+                    error
+                );
+            }
         }
     );
 }
-
 
 /* =====================================================
    START WEBSITE
