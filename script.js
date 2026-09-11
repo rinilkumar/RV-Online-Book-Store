@@ -8834,11 +8834,14 @@ function openEditBookSubcategoryModal(
 
     const books = getBooks();
 
-    const book =
-        books.find(function (item) {
-            return item.id === bookId;
-        });
+   const book =
+    books.find(function (item) {
 
+        return (
+            String(item.id) ===
+            String(bookId)
+        );
+    });
 
     if (!book) {
 
@@ -9118,6 +9121,40 @@ try {
             editingBookData,
             { merge: true }
         );
+
+   /* =========================================
+   UPDATE LOCAL BOOK CACHE
+========================================= */
+
+let books =
+    getBooks();
+
+
+const index =
+    books.findIndex(
+        function (book) {
+
+            return (
+                String(book.id) ===
+                String(editingBookId)
+            );
+        }
+    );
+
+
+if (index >= 0) {
+
+    books[index] = {
+        ...books[index],
+        ...editingBookData
+    };
+
+
+    localStorage.setItem(
+        "books",
+        JSON.stringify(books)
+    );
+}
 
     console.log(
         "Book updated in Firestore:",
