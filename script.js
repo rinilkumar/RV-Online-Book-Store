@@ -252,8 +252,46 @@ function isManagerLoggedIn() {
 
 function managerCanVerifyPayments() {
 
-    if (!isManagerLoggedIn()) {
+    const currentManager =
+        getCurrentManager();
+
+
+    if (
+        !isManagerLoggedIn() ||
+        !currentManager
+    ) {
+
         return false;
+    }
+
+
+    return (
+        currentManager.status ===
+            "Approved" &&
+
+        currentManager.canVerifyPayments ===
+            true
+    );
+}
+
+/* =====================================================
+   MANAGER FIRESTORE LIVE SYNC
+===================================================== */
+
+let managerProfileUnsubscribe =
+    null;
+
+
+function startManagerProfileSync() {
+
+    /* Remove old listener first */
+
+    if (managerProfileUnsubscribe) {
+
+        managerProfileUnsubscribe();
+
+        managerProfileUnsubscribe =
+            null;
     }
 
 
@@ -261,49 +299,310 @@ function managerCanVerifyPayments() {
         getCurrentManager();
 
 
-    if (!currentManager) {
-        return false;
+    const user =
+        auth.currentUser;
+
+
+    /*
+       Only start synchronization when
+       a Manager is actually logged in.
+    */
+
+    if (
+        !user ||
+        !currentManager ||
+        !isManagerLoggedIn()
+    ) {
+
+        return;
     }
 
 
-    const managers =
-        getManagers();
+    /*
+       Make sure the Firebase user belongs
+       to this Manager session.
+    */
+
+    if (
+        currentManager.uid &&
+        currentManager.uid !== user.uid
+    ) {
+
+        return;
+    }
 
 
-    const manager =
-        managers.find(
-            function (item) {
+    const managerRef =
+        db.collection("managers")
+            .doc(user.uid);
 
-                return (
-                    String(item.managerId) ===
-                    String(currentManager.managerId)
+
+    managerProfileUnsubscribe =
+        managerRef.onSnapshot(
+
+            async function (doc) {
+
+                /* =================================
+                   MANAGER PROFILE REMOVED
+                ================================= */
+
+                if (!doc.exists) {
+
+                    if (
+                        managerProfileUnsubscribe
+                    ) {
+
+                        managerProfileUnsubscribe();
+
+                        managerProfileUnsubscribe =
+                            null;
+                    }
+
+
+                    localStorage.removeItem(
+                        "currentManager"
+                    );
+
+                    localStorage.removeItem(
+                        "managerLoggedIn"
+                    );
+
+
+                    try {
+
+                        await auth.signOut();
+
+                    }
+                    catch (error) {
+
+                        console.error(
+                            "Manager sign-out error:",
+                            error
+                        );
+                    }
+
+
+                    updateNavigation();
+
+                    showPage("home");
+
+
+                    alert(
+                        "Your Manager account is no longer available."
+                    );
+
+                    return;
+                }
+
+
+                /* =================================
+                   GET LATEST FIRESTORE PROFILE
+                ================================= */
+
+                const manager = {
+
+                    ...doc.data(),
+
+                    uid:
+                        doc.id
+                };
+
+
+                /* =================================
+                   MANAGER DISABLED / NOT APPROVED
+                ================================= */
+
+                if (
+                    manager.status !==
+                    "Approved"
+                ) {
+
+                    if (
+                        managerProfileUnsubscribe
+                    ) {
+
+                        managerProfileUnsubscribe();
+
+                        managerProfileUnsubscribe =
+                            null;
+                    }
+
+
+                    localStorage.removeItem(
+                        "currentManager"
+                    );
+
+                    localStorage.removeItem(
+                        "managerLoggedIn"
+                    );
+
+
+                    try {
+
+                        await auth.signOut();
+
+                    }
+                    catch (error) {
+
+                        console.error(
+                            "Manager sign-out error:",
+                            error
+                        );
+                    }
+
+
+                    updateNavigation();
+
+                    showPage("home");
+
+
+                    alert(
+                        "Your Manager access has been disabled or is no longer approved."
+                    );
+
+                    return;
+                }
+
+
+                /* =================================
+                   UPDATE CURRENT MANAGER CACHE
+                ================================= */
+
+                localStorage.setItem(
+                    "currentManager",
+                    JSON.stringify(manager)
+                );
+
+
+                localStorage.setItem(
+                    "managerLoggedIn",
+                    "true"
+                );
+
+
+                /* =================================
+                   UPDATE MANAGER LIST CACHE
+                ================================= */
+
+                let managers =
+                    getManagers();
+
+
+                const managerIndex =
+                    managers.findIndex(
+                        function (item) {
+
+                            return (
+                                String(
+                                    item.managerId
+                                ) ===
+                                String(
+                                    manager.managerId
+                                )
+                            );
+                        }
+                    );
+
+
+                if (managerIndex >= 0) {
+
+                    managers[
+                        managerIndex
+                    ] = manager;
+
+                }
+                else {
+
+                    managers.push(
+                        manager
+                    );
+                }
+
+
+                localStorage.setItem(
+                    "managers",
+                    JSON.stringify(
+                        managers
+                    )
+                );
+
+
+                console.log(
+                    "Manager synchronized from Firestore:",
+                    manager
+                );
+
+
+                updateNavigation();
+
+
+                /*
+                   Refresh dashboard so payment
+                   permission changes appear immediately.
+                */
+
+                loadManagerDashboard();
+
+            },
+
+
+            function (error) {
+
+                console.error(
+                    "Manager live sync error:",
+                    error
                 );
 
             }
+
         );
-
-
-    if (!manager) {
-        return false;
-    }
-
-
-    if (
-        manager.status !==
-        "Approved"
-    ) {
-        return false;
-    }
-
-
-    return (
-        manager.canVerifyPayments ===
-        true
-    );
 }
 
 
 
+/* =====================================================
+   RESTORE MANAGER FIREBASE SESSION
+===================================================== */
+
+function restoreManagerSession() {
+
+    auth.onAuthStateChanged(
+        function (user) {
+
+            /*
+               Only restore if this browser already
+               contains a Manager login session.
+            */
+
+            if (
+                !isManagerLoggedIn() ||
+                !getCurrentManager()
+            ) {
+
+                return;
+            }
+
+
+            if (!user) {
+
+                localStorage.removeItem(
+                    "currentManager"
+                );
+
+                localStorage.removeItem(
+                    "managerLoggedIn"
+                );
+
+                updateNavigation();
+
+                return;
+            }
+
+
+            startManagerProfileSync();
+        }
+    );
+}
 
 function generateManagerId() {
 
@@ -740,6 +1039,8 @@ async function managerLogin(event) {
             "true"
         );
 
+       startManagerProfileSync();
+
 
         /*
            Remove any old customer profile
@@ -816,6 +1117,14 @@ async function managerLogout() {
     try {
 
         await auth.signOut();
+
+       if (managerProfileUnsubscribe) {
+
+    managerProfileUnsubscribe();
+
+    managerProfileUnsubscribe =
+        null;
+}
 
 
         localStorage.removeItem(
@@ -5476,12 +5785,44 @@ async function updateDashboard() {
     );
 
 
-    /* MANAGER COUNT */
+   /* =========================================
+   MANAGER COUNT FROM FIRESTORE
+========================================= */
+
+try {
+
+    const managerSnapshot =
+        await db.collection("managers")
+            .get();
+
+
+    setText(
+        "totalManagers",
+        managerSnapshot.size
+    );
+
+
+    console.log(
+        "Total Firestore Managers:",
+        managerSnapshot.size
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading Manager count:",
+        error
+    );
+
+
+    /* TEMPORARY FALLBACK */
 
     setText(
         "totalManagers",
         getManagers().length
     );
+}
 
 
     /* =========================================
@@ -9062,229 +9403,208 @@ function approveManager(managerId) {
     );
 }
 /* =====================================================
-   EDIT MANAGER - ADMIN
+   EDIT MANAGER - FIRESTORE
 ===================================================== */
 
-function editManager(managerId) {
+async function editManager(managerId) {
 
-    // Only Admin can edit Manager details
+    /* =========================================
+       ADMIN CHECK
+    ========================================= */
+
     if (!isAdminLoggedIn()) {
 
-        alert("Admin permission required.");
+        alert(
+            "Admin permission required."
+        );
 
-        showPage("accountPage");
+        showPage(
+            "accountPage"
+        );
 
-        showAccountForm("adminLoginForm");
+        showAccountForm(
+            "adminLoginForm"
+        );
 
         return;
     }
 
 
-    // Get all Managers
-    let managers = getManagers();
+    try {
+
+        /* =========================================
+           FIND MANAGER IN FIRESTORE
+        ========================================= */
+
+        const snapshot =
+            await db.collection("managers")
+                .where(
+                    "managerId",
+                    "==",
+                    managerId
+                )
+                .limit(1)
+                .get();
 
 
-    // Find the selected Manager
-    const manager =
-        managers.find(function (item) {
+        if (snapshot.empty) {
 
-            return (
-                item.managerId === managerId
+            alert(
+                "Manager not found."
             );
 
-        });
+            return;
+        }
 
 
-    // Stop if Manager was not found
-    if (!manager) {
+        const managerDoc =
+            snapshot.docs[0];
 
-        alert("Manager not found.");
-
-        return;
-    }
+        const manager =
+            managerDoc.data();
 
 
-    /* =========================================
-       EDIT NAME
-    ========================================= */
+        /* =========================================
+           EDIT MANAGER NAME
+        ========================================= */
 
-    const newName =
-        prompt(
-            "Enter Manager Name:",
-            manager.name
-        );
-
-
-    // Cancel button pressed
-    if (newName === null) {
-        return;
-    }
-
-
-    /* =========================================
-       EDIT EMAIL
-    ========================================= */
-
-    const newEmail =
-        prompt(
-            "Enter Manager Email:",
-            manager.email
-        );
-
-
-    if (newEmail === null) {
-        return;
-    }
-
-
-    /* =========================================
-       EDIT PHONE
-    ========================================= */
-
-    const newPhone =
-        prompt(
-            "Enter Manager Phone Number:",
-            manager.phone
-        );
-
-
-    if (newPhone === null) {
-        return;
-    }
-
-
-    // Remove unwanted spaces
-    const cleanName =
-        newName.trim();
-
-    const cleanEmail =
-        newEmail
-            .trim()
-            .toLowerCase();
-
-    const cleanPhone =
-        newPhone.trim();
-
-
-    /* =========================================
-       VALIDATION
-    ========================================= */
-
-    if (
-        !cleanName ||
-        !cleanEmail ||
-        !cleanPhone
-    ) {
-
-        alert(
-            "Manager details cannot be empty."
-        );
-
-        return;
-    }
-
-
-    // Check whether another Manager
-    // already uses the new email
-    const emailExists =
-        managers.some(function (item) {
-
-            return (
-
-                item.managerId !== managerId
-
-                &&
-
-                item.email
-                    .toLowerCase() ===
-                cleanEmail
-
+        const newName =
+            prompt(
+                "Enter Manager Name:",
+                manager.name || ""
             );
 
-        });
+
+        if (newName === null) {
+            return;
+        }
 
 
-    if (emailExists) {
+        /* =========================================
+           EDIT PHONE
+        ========================================= */
+
+        const newPhone =
+            prompt(
+                "Enter Manager Phone Number:",
+                manager.phone || ""
+            );
+
+
+        if (newPhone === null) {
+            return;
+        }
+
+
+        const cleanName =
+            newName.trim();
+
+        const cleanPhone =
+            newPhone.trim();
+
+
+        /* =========================================
+           VALIDATION
+        ========================================= */
+
+        if (
+            !cleanName ||
+            !cleanPhone
+        ) {
+
+            alert(
+                "Manager name and phone number cannot be empty."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           UPDATE FIRESTORE
+        ========================================= */
+
+        await db.collection("managers")
+            .doc(managerDoc.id)
+            .update({
+
+                name:
+                    cleanName,
+
+                phone:
+                    cleanPhone,
+
+                updatedDate:
+                    new Date()
+                        .toLocaleString()
+
+            });
+
+
+        console.log(
+            "Manager details updated:",
+            managerId
+        );
+
+
+        /* =========================================
+           UPDATE CURRENT MANAGER CACHE
+           IF SAME MANAGER IS STORED HERE
+        ========================================= */
+
+        const currentManager =
+            getCurrentManager();
+
+
+        if (
+            currentManager &&
+            currentManager.managerId ===
+                managerId
+        ) {
+
+            currentManager.name =
+                cleanName;
+
+            currentManager.phone =
+                cleanPhone;
+
+
+            localStorage.setItem(
+                "currentManager",
+                JSON.stringify(
+                    currentManager
+                )
+            );
+        }
+
+
+        /* =========================================
+           REFRESH MANAGER LIST
+        ========================================= */
+
+        await displayManagers();
+
 
         alert(
-            "Another Manager already uses this email."
+            "Manager details updated successfully.\n\n" +
+            "Manager ID: " +
+            manager.managerId
         );
 
-        return;
     }
+    catch (error) {
+
+        console.error(
+            "Manager edit error:",
+            error
+        );
 
 
-    /* =========================================
-       UPDATE MANAGER
-    ========================================= */
-
-    manager.name =
-        cleanName;
-
-    manager.email =
-        cleanEmail;
-
-    manager.phone =
-        cleanPhone;
-
-
-    /*
-       IMPORTANT:
-
-       We DO NOT change:
-
-       manager.managerId
-
-       Therefore MGR001 always remains MGR001.
-    */
-
-
-    // Save changes
-    localStorage.setItem(
-        "managers",
-        JSON.stringify(managers)
-    );
-
-
-    /* =========================================
-       UPDATE ACTIVE MANAGER SESSION
-    ========================================= */
-
-    const currentManager =
-        getCurrentManager();
-
-
-    if (
-        currentManager &&
-        currentManager.managerId === managerId
-    ) {
-
-        currentManager.name =
-            cleanName;
-
-        currentManager.email =
-            cleanEmail;
-
-        currentManager.phone =
-            cleanPhone;
-
-
-        localStorage.setItem(
-            "currentManager",
-            JSON.stringify(currentManager)
+        alert(
+            "Manager details could not be updated.\n\n" +
+            error.message
         );
     }
-
-
-    // Refresh Manager cards
-    displayManagers();
-
-
-    alert(
-        "Manager details updated successfully.\n\n" +
-        "Manager ID: " +
-        manager.managerId
-    );
 }
 
 /* =====================================================
@@ -9535,125 +9855,186 @@ async function changeManagerStatus(
 }
 
 /* =====================================================
-   REMOVE MANAGER - ADMIN
+   REMOVE MANAGER - FIRESTORE
 ===================================================== */
 
-function removeManager(managerId) {
+async function removeManager(managerId) {
 
-    // Only Admin can remove Managers
+    /* =========================================
+       ADMIN CHECK
+    ========================================= */
+
     if (!isAdminLoggedIn()) {
 
-        alert("Admin permission required.");
-
-        showPage("accountPage");
-
-        showAccountForm("adminLoginForm");
-
-        return;
-    }
-
-
-    // Get all Managers
-    let managers = getManagers();
-
-
-    // Find Manager before deleting
-    const manager = managers.find(function (item) {
-
-        return item.managerId === managerId;
-
-    });
-
-
-    // Stop if Manager does not exist
-    if (!manager) {
-
-        alert("Manager not found.");
-
-        return;
-    }
-
-
-    /* =========================================
-       CONFIRM BEFORE REMOVING
-    ========================================= */
-
-    const confirmRemove = confirm(
-
-        "Are you sure you want to remove this Manager?\n\n" +
-
-        "Manager ID: " + manager.managerId + "\n" +
-
-        "Name: " + manager.name + "\n\n" +
-
-        "This action will remove the Manager account."
-
-    );
-
-
-    if (!confirmRemove) {
-
-        return;
-
-    }
-
-
-    /* =========================================
-       REMOVE MANAGER
-    ========================================= */
-
-    managers = managers.filter(function (item) {
-
-        return item.managerId !== managerId;
-
-    });
-
-
-    // Save updated Manager list
-    localStorage.setItem(
-        "managers",
-        JSON.stringify(managers)
-    );
-
-
-    /* =========================================
-       REMOVE ACTIVE SESSION IF NECESSARY
-    ========================================= */
-
-    const currentManager =
-        getCurrentManager();
-
-
-    if (
-        currentManager &&
-        currentManager.managerId === managerId
-    ) {
-
-        localStorage.removeItem(
-            "currentManager"
+        alert(
+            "Admin permission required."
         );
 
-        localStorage.removeItem(
-            "managerLoggedIn"
+        showPage(
+            "accountPage"
         );
 
+        showAccountForm(
+            "adminLoginForm"
+        );
+
+        return;
     }
 
 
-    /* =========================================
-       REFRESH ADMIN DISPLAY
-    ========================================= */
+    try {
 
-    displayManagers();
+        /* =========================================
+           FIND MANAGER IN FIRESTORE
+        ========================================= */
 
-    updateDashboard();
+        const snapshot =
+            await db.collection("managers")
+                .where(
+                    "managerId",
+                    "==",
+                    managerId
+                )
+                .limit(1)
+                .get();
 
 
-    alert(
-        "Manager " +
-        manager.managerId +
-        " removed successfully."
-    );
+        if (snapshot.empty) {
+
+            alert(
+                "Manager not found."
+            );
+
+            return;
+        }
+
+
+        const managerDoc =
+            snapshot.docs[0];
+
+        const manager =
+            managerDoc.data();
+
+
+        /* =========================================
+           CONFIRM REMOVE
+        ========================================= */
+
+        const confirmRemove =
+            confirm(
+
+                "Are you sure you want to remove this Manager?\n\n" +
+
+                "Manager ID: " +
+                manager.managerId +
+
+                "\nName: " +
+                manager.name +
+
+                "\n\nThe Manager profile will be removed."
+
+            );
+
+
+        if (!confirmRemove) {
+            return;
+        }
+
+
+        /* =========================================
+           DELETE FIRESTORE MANAGER PROFILE
+        ========================================= */
+
+        await db.collection("managers")
+            .doc(managerDoc.id)
+            .delete();
+
+
+        console.log(
+            "Manager removed from Firestore:",
+            manager.managerId
+        );
+
+
+        /* =========================================
+           UPDATE LOCAL MANAGER CACHE
+        ========================================= */
+
+        let managers =
+            getManagers();
+
+
+        managers =
+            managers.filter(
+                function (item) {
+
+                    return (
+                        item.managerId !==
+                        managerId
+                    );
+                }
+            );
+
+
+        localStorage.setItem(
+            "managers",
+            JSON.stringify(managers)
+        );
+
+
+        /* =========================================
+           REMOVE CURRENT SESSION IF NECESSARY
+        ========================================= */
+
+        const currentManager =
+            getCurrentManager();
+
+
+        if (
+            currentManager &&
+            currentManager.managerId ===
+                managerId
+        ) {
+
+            localStorage.removeItem(
+                "currentManager"
+            );
+
+            localStorage.removeItem(
+                "managerLoggedIn"
+            );
+        }
+
+
+        /* =========================================
+           REFRESH ADMIN DISPLAY
+        ========================================= */
+
+        await displayManagers();
+
+        updateDashboard();
+
+
+        alert(
+            "Manager " +
+            manager.managerId +
+            " removed successfully."
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Manager removal error:",
+            error
+        );
+
+
+        alert(
+            "Manager could not be removed.\n\n" +
+            error.message
+        );
+    }
 }
 
 
@@ -11598,6 +11979,8 @@ document.addEventListener(
        await loadSubcategoriesFromFirestore();
 
        restoreCustomerSession();
+
+       restoreManagerSession();
 
         loadCategoryFilter();
 
