@@ -8641,14 +8641,14 @@ function displayManagers() {
 }
 
 /* =====================================================
-   ALLOW MANAGER PAYMENT VERIFICATION - ADMIN
+   ALLOW MANAGER PAYMENT VERIFICATION - FIRESTORE
 ===================================================== */
 
-function allowManagerPaymentPermission(
+async function allowManagerPaymentPermission(
     managerId
 ) {
 
-    /* ADMIN ONLY */
+    /* ADMIN CHECK */
 
     if (!isAdminLoggedIn()) {
 
@@ -8656,7 +8656,9 @@ function allowManagerPaymentPermission(
             "Admin permission required."
         );
 
-        showPage("accountPage");
+        showPage(
+            "accountPage"
+        );
 
         showAccountForm(
             "adminLoginForm"
@@ -8666,114 +8668,146 @@ function allowManagerPaymentPermission(
     }
 
 
-    let managers =
-        getManagers();
+    try {
 
+        /* FIND MANAGER IN FIRESTORE */
 
-    const manager =
-        managers.find(
-            function (item) {
-
-                return (
-                    item.managerId ===
+        const snapshot =
+            await db.collection("managers")
+                .where(
+                    "managerId",
+                    "==",
                     managerId
-                );
+                )
+                .limit(1)
+                .get();
 
-            }
+
+        if (snapshot.empty) {
+
+            alert(
+                "Manager not found."
+            );
+
+            return;
+        }
+
+
+        const managerDoc =
+            snapshot.docs[0];
+
+        const manager =
+            managerDoc.data();
+
+
+        /* ONLY APPROVED MANAGER */
+
+        if (
+            manager.status !==
+            "Approved"
+        ) {
+
+            alert(
+                "Only approved Managers can receive payment verification permission."
+            );
+
+            return;
+        }
+
+
+        if (
+            manager.canVerifyPayments ===
+            true
+        ) {
+
+            alert(
+                "This Manager already has payment verification permission."
+            );
+
+            return;
+        }
+
+
+        const confirmed =
+            confirm(
+                "Allow payment verification permission for " +
+                manager.name +
+                " (" +
+                manager.managerId +
+                ")?"
+            );
+
+
+        if (!confirmed) {
+            return;
+        }
+
+
+        /* UPDATE FIRESTORE */
+
+        await db.collection("managers")
+            .doc(managerDoc.id)
+            .update({
+
+                canVerifyPayments:
+                    true
+
+            });
+
+
+        console.log(
+            "Payment permission allowed:",
+            manager.managerId
         );
 
 
-    if (!manager) {
+        /* UPDATE CURRENT BROWSER SESSION IF NEEDED */
+
+        manager.canVerifyPayments =
+            true;
+
+        updateCurrentManagerPermission(
+            manager
+        );
+
+
+        /* REFRESH ADMIN MANAGER LIST */
+
+        await displayManagers();
+
 
         alert(
-            "Manager not found."
-        );
-
-        return;
-    }
-
-
-    /* ONLY APPROVED MANAGER */
-
-    if (
-        manager.status !==
-        "Approved"
-    ) {
-
-        alert(
-            "Only approved Managers can receive payment verification permission."
-        );
-
-        return;
-    }
-
-
-    if (
-        manager.canVerifyPayments ===
-        true
-    ) {
-
-        alert(
-            "This Manager already has payment verification permission."
-        );
-
-        return;
-    }
-
-
-    const confirmed =
-        confirm(
-            "Allow payment verification permission for " +
+            "Payment verification permission allowed.\n\n" +
+            "Manager: " +
             manager.name +
-            " (" +
-            manager.managerId +
-            ")?"
+            "\nManager ID: " +
+            manager.managerId
         );
 
-
-    if (!confirmed) {
-        return;
     }
+    catch (error) {
 
+        console.error(
+            "Error allowing Manager payment permission:",
+            error
+        );
 
-    manager.canVerifyPayments =
-        true;
-
-
-    localStorage.setItem(
-        "managers",
-        JSON.stringify(managers)
-    );
-
-
-    /* UPDATE ACTIVE MANAGER SESSION */
-
-    updateCurrentManagerPermission(
-        manager
-    );
-
-
-    displayManagers();
-
-
-    alert(
-        "Payment verification permission allowed.\n\n" +
-        "Manager: " +
-        manager.name +
-        "\nManager ID: " +
-        manager.managerId
-    );
+        alert(
+            "Could not allow payment permission.\n\n" +
+            error.message
+        );
+    }
 }
 
 /* =====================================================
-   REMOVE MANAGER PAYMENT VERIFICATION - ADMIN
+   REMOVE MANAGER PAYMENT VERIFICATION - FIRESTORE
 ===================================================== */
 
-function removeManagerPaymentPermission(
+async function removeManagerPaymentPermission(
     managerId
 ) {
 
-    /* ADMIN ONLY */
+    /* ADMIN CHECK */
 
     if (!isAdminLoggedIn()) {
 
@@ -8781,7 +8815,9 @@ function removeManagerPaymentPermission(
             "Admin permission required."
         );
 
-        showPage("accountPage");
+        showPage(
+            "accountPage"
+        );
 
         showAccountForm(
             "adminLoginForm"
@@ -8791,75 +8827,120 @@ function removeManagerPaymentPermission(
     }
 
 
-    let managers =
-        getManagers();
+    try {
 
+        /* FIND MANAGER IN FIRESTORE */
 
-    const manager =
-        managers.find(
-            function (item) {
-
-                return (
-                    item.managerId ===
+        const snapshot =
+            await db.collection("managers")
+                .where(
+                    "managerId",
+                    "==",
                     managerId
-                );
+                )
+                .limit(1)
+                .get();
 
-            }
+
+        if (snapshot.empty) {
+
+            alert(
+                "Manager not found."
+            );
+
+            return;
+        }
+
+
+        const managerDoc =
+            snapshot.docs[0];
+
+        const manager =
+            managerDoc.data();
+
+
+        if (
+            manager.canVerifyPayments !==
+            true
+        ) {
+
+            alert(
+                "This Manager does not have payment verification permission."
+            );
+
+            return;
+        }
+
+
+        const confirmed =
+            confirm(
+                "Remove payment verification permission from " +
+                manager.name +
+                " (" +
+                manager.managerId +
+                ")?"
+            );
+
+
+        if (!confirmed) {
+            return;
+        }
+
+
+        /* UPDATE FIRESTORE */
+
+        await db.collection("managers")
+            .doc(managerDoc.id)
+            .update({
+
+                canVerifyPayments:
+                    false
+
+            });
+
+
+        console.log(
+            "Payment permission removed:",
+            manager.managerId
         );
 
 
-    if (!manager) {
+        /* UPDATE CURRENT BROWSER SESSION IF NEEDED */
+
+        manager.canVerifyPayments =
+            false;
+
+        updateCurrentManagerPermission(
+            manager
+        );
+
+
+        /* REFRESH ADMIN MANAGER LIST */
+
+        await displayManagers();
+
 
         alert(
-            "Manager not found."
-        );
-
-        return;
-    }
-
-
-    const confirmed =
-        confirm(
-            "Remove payment verification permission from " +
+            "Payment verification permission removed.\n\n" +
+            "Manager: " +
             manager.name +
-            " (" +
-            manager.managerId +
-            ")?"
+            "\nManager ID: " +
+            manager.managerId
         );
 
-
-    if (!confirmed) {
-        return;
     }
+    catch (error) {
 
+        console.error(
+            "Error removing Manager payment permission:",
+            error
+        );
 
-    manager.canVerifyPayments =
-        false;
-
-
-    localStorage.setItem(
-        "managers",
-        JSON.stringify(managers)
-    );
-
-
-    /* UPDATE ACTIVE MANAGER SESSION */
-
-    updateCurrentManagerPermission(
-        manager
-    );
-
-
-    displayManagers();
-
-
-    alert(
-        "Payment verification permission removed.\n\n" +
-        "Manager: " +
-        manager.name +
-        "\nManager ID: " +
-        manager.managerId
-    );
+        alert(
+            "Could not remove payment permission.\n\n" +
+            error.message
+        );
+    }
 }
 
 /* =====================================================
