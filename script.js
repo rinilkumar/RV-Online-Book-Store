@@ -9413,7 +9413,7 @@ function openManagersPage() {
    DISPLAY MANAGERS - ADMIN
 ===================================================== */
 
-function displayManagers() {
+async  function displayManagers() {
 
     const container =
         document.getElementById("managersList");
@@ -9430,8 +9430,96 @@ function displayManagers() {
     }
 
 
-    // Get all Managers from localStorage
-    const managers = getManagers();
+   /* =========================================
+   LOAD MANAGERS FROM FIRESTORE
+========================================= */
+
+let managers = [];
+
+try {
+
+    const snapshot =
+        await db.collection("managers")
+            .get();
+
+
+    snapshot.forEach(
+        function (doc) {
+
+            const data =
+                doc.data();
+
+
+            managers.push({
+
+                ...data,
+
+                uid:
+                    data.uid ||
+                    doc.id
+
+            });
+        }
+    );
+
+
+    /* SORT BY MANAGER ID */
+
+    managers.sort(
+        function (a, b) {
+
+            return String(
+                a.managerId || ""
+            ).localeCompare(
+                String(
+                    b.managerId || ""
+                )
+            );
+        }
+    );
+
+
+    /* KEEP LOCAL CACHE UPDATED */
+
+    localStorage.setItem(
+        "managers",
+        JSON.stringify(
+            managers
+        )
+    );
+
+
+    console.log(
+        "Managers loaded from Firestore:",
+        managers
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading Managers from Firestore:",
+        error
+    );
+
+
+    container.innerHTML = `
+        <div class="empty-message">
+
+            <h3>
+                Could not load Managers.
+            </h3>
+
+            <p>
+                Please check the Console
+                for the Firestore error.
+            </p>
+
+        </div>
+    `;
+
+    return;
+}
 
 
     // Clear old Manager cards
