@@ -9314,71 +9314,153 @@ function enableManager(managerId) {
 
 
 /* =====================================================
-   CHANGE MANAGER STATUS
+   CHANGE MANAGER STATUS - FIRESTORE
 ===================================================== */
 
-function changeManagerStatus(
+async function changeManagerStatus(
     managerId,
     newStatus
 ) {
 
-    // Only Admin can change Manager status
+    /* =========================================
+       ADMIN CHECK
+    ========================================= */
+
     if (!isAdminLoggedIn()) {
 
-        alert("Admin permission required.");
+        alert(
+            "Admin permission required."
+        );
 
-        showPage("accountPage");
+        showPage(
+            "accountPage"
+        );
 
-        showAccountForm("adminLoginForm");
+        showAccountForm(
+            "adminLoginForm"
+        );
 
         return;
     }
 
 
-    // Get all Managers
-    let managers =
-        getManagers();
+    try {
+
+        /* =========================================
+           FIND MANAGER IN FIRESTORE
+        ========================================= */
+
+        const snapshot =
+            await db.collection("managers")
+                .where(
+                    "managerId",
+                    "==",
+                    managerId
+                )
+                .limit(1)
+                .get();
 
 
-    // Find selected Manager
-    const manager =
-        managers.find(function (item) {
+        if (snapshot.empty) {
 
-            return (
-                item.managerId === managerId
+            alert(
+                "Manager not found."
             );
 
-        });
+            return;
+        }
 
 
-    if (!manager) {
+        const managerDoc =
+            snapshot.docs[0];
 
-        alert("Manager not found.");
-
-        return;
-    }
-
-
-    /* =========================================
-       UPDATE STATUS
-    ========================================= */
-
-    manager.status =
-        newStatus;
+        const manager =
+            managerDoc.data();
 
 
-    // Save Manager list
-    localStorage.setItem(
-        "managers",
-        JSON.stringify(managers)
-    );
+        /* =========================================
+           CHECK CURRENT STATUS
+        ========================================= */
+
+        if (
+            manager.status ===
+            newStatus
+        ) {
+
+            alert(
+                "Manager is already " +
+                newStatus +
+                "."
+            );
+
+            return;
+        }
 
 
-    /* =========================================
-       IF MANAGER IS DISABLED WHILE LOGGED IN
-    ========================================= */
+        /* =========================================
+           CONFIRM STATUS CHANGE
+        ========================================= */
 
-    if (newStatus === "Disabled") {
+        let message = "";
+
+
+        if (
+            newStatus ===
+            "Disabled"
+        ) {
+
+            message =
+                "Disable this Manager?\n\n" +
+                "Manager ID: " +
+                manager.managerId +
+                "\nManager Name: " +
+                manager.name;
+
+        }
+        else {
+
+            message =
+                "Enable this Manager?\n\n" +
+                "Manager ID: " +
+                manager.managerId +
+                "\nManager Name: " +
+                manager.name;
+        }
+
+
+        const confirmed =
+            confirm(message);
+
+
+        if (!confirmed) {
+            return;
+        }
+
+
+        /* =========================================
+           UPDATE FIRESTORE
+        ========================================= */
+
+        await db.collection("managers")
+            .doc(managerDoc.id)
+            .update({
+
+                status:
+                    newStatus
+
+            });
+
+
+        console.log(
+            "Manager status updated:",
+            manager.managerId,
+            newStatus
+        );
+
+
+        /* =========================================
+           UPDATE LOCAL ACTIVE SESSION IF SAME USER
+        ========================================= */
 
         const currentManager =
             getCurrentManager();
@@ -9386,36 +9468,70 @@ function changeManagerStatus(
 
         if (
             currentManager &&
-            currentManager.managerId === managerId
+            currentManager.managerId ===
+                managerId
         ) {
 
-            localStorage.removeItem(
-                "currentManager"
-            );
+            if (
+                newStatus ===
+                "Disabled"
+            ) {
 
-            localStorage.removeItem(
-                "managerLoggedIn"
-            );
+                localStorage.removeItem(
+                    "currentManager"
+                );
+
+                localStorage.removeItem(
+                    "managerLoggedIn"
+                );
+
+            }
+            else {
+
+                currentManager.status =
+                    newStatus;
+
+                localStorage.setItem(
+                    "currentManager",
+                    JSON.stringify(
+                        currentManager
+                    )
+                );
+            }
         }
+
+
+        /* =========================================
+           REFRESH ADMIN PAGE
+        ========================================= */
+
+        await displayManagers();
+
+        updateDashboard();
+
+
+        alert(
+            "Manager " +
+            manager.managerId +
+            " status changed to " +
+            newStatus +
+            "."
+        );
+
     }
+    catch (error) {
+
+        console.error(
+            "Manager status update error:",
+            error
+        );
 
 
-    /* =========================================
-       REFRESH ADMIN PAGE
-    ========================================= */
-
-    displayManagers();
-
-    updateDashboard();
-
-
-    alert(
-        "Manager " +
-        manager.managerId +
-        " status changed to " +
-        newStatus +
-        "."
-    );
+        alert(
+            "Manager status could not be changed.\n\n" +
+            error.message
+        );
+    }
 }
 
 /* =====================================================
