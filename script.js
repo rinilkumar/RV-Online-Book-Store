@@ -11678,33 +11678,7 @@ catch (error) {
 
 ${
     order.paymentMethod === "UPI"
-        ?
-   ${
-    order.paymentMethod ===
-        "Cash on Delivery" &&
-
-    order.stockReduced !== true &&
-
-    order.status ===
-        "Awaiting Admin Confirmation"
-
         ? `
-            <div class="payment-verification-buttons">
-
-                <button
-                    type="button"
-                    class="verify-payment-btn"
-                    onclick="confirmCODOrder('${order.id}')"
-                >
-                    ✓ Confirm COD Order
-                </button>
-
-            </div>
-        `
-
-        : ""
-}
-`
 <div class="admin-payment-info">
 
     <p>
@@ -11936,6 +11910,32 @@ ${
 
             </div>
         `
+        : ""
+}
+
+${
+    order.paymentMethod ===
+        "Cash on Delivery" &&
+
+    order.stockReduced !== true &&
+
+    order.status ===
+        "Awaiting Admin Confirmation"
+
+        ? `
+            <div class="payment-verification-buttons">
+
+                <button
+                    type="button"
+                    class="verify-payment-btn"
+                    onclick="confirmCODOrder('${order.id}')"
+                >
+                    ✓ Confirm COD Order
+                </button>
+
+            </div>
+        `
+
         : ""
 }
                 `;
