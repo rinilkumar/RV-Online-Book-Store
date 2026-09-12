@@ -38,30 +38,7 @@ console.log(db);
 ===================================================== */
 
 function initializeStorage() {
-
-    /* CUSTOMERS */
-
-    if (!localStorage.getItem("customers")) {
-
-        localStorage.setItem(
-            "customers",
-            JSON.stringify([])
-        );
-    }
-
-
-    /* ORDERS */
-
-    if (!localStorage.getItem("orders")) {
-
-        localStorage.setItem(
-            "orders",
-            JSON.stringify([])
-        );
-    }
-
-
-    /* CART */
+  /* CART */
 
     if (!localStorage.getItem("cart")) {
 
@@ -104,28 +81,7 @@ if (!localStorage.getItem("subcategories")) {
 }
 
 
-    /* MANAGERS */
-
-    if (!localStorage.getItem("managers")) {
-
-        localStorage.setItem(
-            "managers",
-            JSON.stringify([])
-        );
-    }
-
-
-    /* MANAGER ID COUNTER */
-
-    if (!localStorage.getItem("lastManagerNumber")) {
-
-        localStorage.setItem(
-            "lastManagerNumber",
-            "0"
-        );
-    }
-}
-
+   
 
 /* =====================================================
    STORAGE HELPERS
@@ -136,21 +92,6 @@ function getBooks() {
         localStorage.getItem("books")
     ) || [];
 }
-
-
-function getCustomers() {
-    return JSON.parse(
-        localStorage.getItem("customers")
-    ) || [];
-}
-
-
-function getOrders() {
-    return JSON.parse(
-        localStorage.getItem("orders")
-    ) || [];
-}
-
 
 function getCart() {
     return JSON.parse(
@@ -182,53 +123,7 @@ function getCurrentCustomer() {
         localStorage.getItem("currentCustomer")
     );
 }
-/* =====================================================
-   MANAGER STORAGE HELPERS
-===================================================== */
 
-function getManagers() {
-
-    return JSON.parse(
-        localStorage.getItem("managers")
-    ) || [];
-}
-
-function initializeManagerPermissions() {
-
-    let managers =
-        getManagers();
-
-
-    let changed = false;
-
-
-    managers.forEach(
-        function (manager) {
-
-            if (
-                typeof manager.canVerifyPayments ===
-                "undefined"
-            ) {
-
-                manager.canVerifyPayments =
-                    false;
-
-                changed = true;
-            }
-
-        }
-    );
-
-
-    if (changed) {
-
-        localStorage.setItem(
-            "managers",
-            JSON.stringify(managers)
-        );
-
-    }
-}
 
 function getCurrentManager() {
 
@@ -464,14 +359,6 @@ function startManagerProfileSync() {
                 }
 
 
-                /* =================================
-                   UPDATE CURRENT MANAGER CACHE
-                ================================= */
-
-                localStorage.setItem(
-                    "currentManager",
-                    JSON.stringify(manager)
-                );
 
 
                 localStorage.setItem(
@@ -603,32 +490,6 @@ function restoreManagerSession() {
         }
     );
 }
-
-function generateManagerId() {
-
-    let lastNumber =
-        Number(
-            localStorage.getItem(
-                "lastManagerNumber"
-            )
-        ) || 0;
-
-
-    lastNumber++;
-
-
-    localStorage.setItem(
-        "lastManagerNumber",
-        String(lastNumber)
-    );
-
-
-    return (
-        "MGR" +
-        String(lastNumber).padStart(3, "0")
-    );
-}
-
 
 /* =====================================================
    REGISTER MANAGER - FIREBASE + SECURE COUNTER
@@ -6363,15 +6224,6 @@ try {
     );
 
 
-    // Keep local copy for existing functions
-
-    orders.push(order);
-
-    localStorage.setItem(
-        "orders",
-        JSON.stringify(orders)
-    );
-
 
     // Save latest order for receipt
 
@@ -6587,15 +6439,6 @@ try {
         order
     );
 
-
-    // Keep local copy for existing functions
-
-    orders.push(order);
-
-    localStorage.setItem(
-        "orders",
-        JSON.stringify(orders)
-    );
 
 }
 catch (error) {
@@ -7144,20 +6987,80 @@ ${
 
 async function updateDashboard() {
 
-    /* BOOK COUNT */
+    /* =========================================
+   BOOK COUNT FROM FIRESTORE
+========================================= */
+
+try {
+
+    const bookSnapshot =
+        await db.collection("books")
+            .get();
+
 
     setText(
         "totalBooks",
-        getBooks().length
+        bookSnapshot.size
     );
 
 
-    /* CUSTOMER COUNT */
+    console.log(
+        "Total Firestore books:",
+        bookSnapshot.size
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading book count:",
+        error
+    );
+
+
+    setText(
+        "totalBooks",
+        "-"
+    );
+}
+
+
+/* =========================================
+   CUSTOMER COUNT FROM FIRESTORE
+========================================= */
+
+try {
+
+    const customerSnapshot =
+        await db.collection("customers")
+            .get();
+
 
     setText(
         "totalCustomers",
-        getCustomers().length
+        customerSnapshot.size
     );
+
+
+    console.log(
+        "Total Firestore customers:",
+        customerSnapshot.size
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading customer count:",
+        error
+    );
+
+
+    setText(
+        "totalCustomers",
+        "-"
+    );
+}
 
 
    /* =========================================
@@ -7845,17 +7748,6 @@ try {
         }
     );
 
-
-    /*
-       Keep the full Firestore order list locally
-       because Manager verify/reject functions
-       still use getOrders().
-    */
-
-    localStorage.setItem(
-        "orders",
-        JSON.stringify(orders)
-    );
 
 
     console.log(
@@ -8570,75 +8462,31 @@ async function managerVerifyPayment(orderId) {
                 : null;
 
 
-        /* =========================================
-           UPDATE LOCAL CACHE
-        ========================================= */
-
         if (updatedOrder) {
 
-            let orders =
-                getOrders();
+    const latestOrder =
+        JSON.parse(
+            localStorage.getItem(
+                "latestOrder"
+            ) || "null"
+        );
 
 
-            const index =
-                orders.findIndex(
-                    function (order) {
+    if (
+        latestOrder &&
+        String(latestOrder.id) ===
+        String(orderId)
+    ) {
 
-                        return (
-                            String(order.id) ===
-                            String(orderId)
-                        );
-                    }
-                );
+        localStorage.setItem(
+            "latestOrder",
+            JSON.stringify(
+                updatedOrder
+            )
+        );
 
-
-            if (index >= 0) {
-
-                orders[index] =
-                    updatedOrder;
-
-            }
-            else {
-
-                orders.push(
-                    updatedOrder
-                );
-
-            }
-
-
-            localStorage.setItem(
-                "orders",
-                JSON.stringify(
-                    orders
-                )
-            );
-
-
-            const latestOrder =
-                JSON.parse(
-                    localStorage.getItem(
-                        "latestOrder"
-                    ) || "null"
-                );
-
-
-            if (
-                latestOrder &&
-                String(latestOrder.id) ===
-                String(orderId)
-            ) {
-
-                localStorage.setItem(
-                    "latestOrder",
-                    JSON.stringify(
-                        updatedOrder
-                    )
-                );
-
-            }
-
-        }
+    }
+}
 
 
         /* =========================================
@@ -9057,72 +8905,31 @@ async function managerRejectPayment(orderId) {
            UPDATE LOCAL CACHE
         ========================================= */
 
-        if (updatedOrder) {
+      if (updatedOrder) {
 
-            let orders =
-                getOrders();
-
-
-            const index =
-                orders.findIndex(
-                    function (item) {
-
-                        return (
-                            String(item.id) ===
-                            String(orderId)
-                        );
-
-                    }
-                );
+    const latestOrder =
+        JSON.parse(
+            localStorage.getItem(
+                "latestOrder"
+            ) || "null"
+        );
 
 
-            if (index >= 0) {
+    if (
+        latestOrder &&
+        String(latestOrder.id) ===
+        String(orderId)
+    ) {
 
-                orders[index] =
-                    updatedOrder;
+        localStorage.setItem(
+            "latestOrder",
+            JSON.stringify(
+                updatedOrder
+            )
+        );
 
-            }
-            else {
-
-                orders.push(
-                    updatedOrder
-                );
-
-            }
-
-
-            localStorage.setItem(
-                "orders",
-                JSON.stringify(
-                    orders
-                )
-            );
-
-
-            const latestOrder =
-                JSON.parse(
-                    localStorage.getItem(
-                        "latestOrder"
-                    ) || "null"
-                );
-
-
-            if (
-                latestOrder &&
-                String(latestOrder.id) ===
-                String(orderId)
-            ) {
-
-                localStorage.setItem(
-                    "latestOrder",
-                    JSON.stringify(
-                        updatedOrder
-                    )
-                );
-
-            }
-
-        }
+    }
+}
 
 
         /* =========================================
@@ -10036,7 +9843,24 @@ catch (error) {
         error
     );
 
-    books = getBooks();
+
+    container.innerHTML = `
+        <div class="empty-message">
+
+            <h3>
+                Book details could not be loaded.
+            </h3>
+
+            <p>
+                Please check your connection
+                and try again.
+            </p>
+
+        </div>
+    `;
+
+
+    return;
 }
 
 
@@ -12183,30 +12007,7 @@ async function removeManager(managerId) {
         );
 
 
-        /* =========================================
-           UPDATE LOCAL MANAGER CACHE
-        ========================================= */
-
-        let managers =
-            getManagers();
-
-
-        managers =
-            managers.filter(
-                function (item) {
-
-                    return (
-                        item.managerId !==
-                        managerId
-                    );
-                }
-            );
-
-
-        localStorage.setItem(
-            "managers",
-            JSON.stringify(managers)
-        );
+   
 
 
         /* =========================================
@@ -12344,11 +12145,6 @@ try {
     );
 
 
-    localStorage.setItem(
-        "customers",
-        JSON.stringify(customers)
-    );
-
 
     console.log(
         "Customers loaded from Firestore:",
@@ -12363,9 +12159,24 @@ catch (error) {
         error
     );
 
-    customers =
-        getCustomers();
 
+    container.innerHTML = `
+        <div class="empty-message">
+
+            <h3>
+                Customer details could not be loaded.
+            </h3>
+
+            <p>
+                Please check your connection
+                and try again.
+            </p>
+
+        </div>
+    `;
+
+
+    return;
 }
 
     container.innerHTML = "";
@@ -12501,13 +12312,6 @@ try {
         }
     );
 
-
-    /* Keep local cache */
-
-    localStorage.setItem(
-        "orders",
-        JSON.stringify(orders)
-    );
 
 
     console.log(
@@ -14006,67 +13810,29 @@ async function verifyOrderPayment(orderId) {
 
         if (updatedOrder) {
 
-            let orders =
-                getOrders();
+    const latestOrder =
+        JSON.parse(
+            localStorage.getItem(
+                "latestOrder"
+            ) || "null"
+        );
 
 
-            const index =
-                orders.findIndex(
-                    function (order) {
+    if (
+        latestOrder &&
+        String(latestOrder.id) ===
+        String(orderId)
+    ) {
 
-                        return (
-                            String(order.id) ===
-                            String(orderId)
-                        );
-                    }
-                );
+        localStorage.setItem(
+            "latestOrder",
+            JSON.stringify(
+                updatedOrder
+            )
+        );
 
-
-            if (index >= 0) {
-
-                orders[index] =
-                    updatedOrder;
-
-            }
-            else {
-
-                orders.push(
-                    updatedOrder
-                );
-
-            }
-
-
-            localStorage.setItem(
-                "orders",
-                JSON.stringify(
-                    orders
-                )
-            );
-
-
-            const latestOrder =
-                JSON.parse(
-                    localStorage.getItem(
-                        "latestOrder"
-                    ) || "null"
-                );
-
-
-            if (
-                latestOrder &&
-                String(latestOrder.id) ===
-                String(orderId)
-            ) {
-
-                localStorage.setItem(
-                    "latestOrder",
-                    JSON.stringify(
-                        updatedOrder
-                    )
-                );
-            }
-        }
+    }
+}
 
 
         /* =========================================
@@ -14343,72 +14109,31 @@ async function rejectOrderPayment(orderId) {
            UPDATE LOCAL CACHE
         ========================================= */
 
-        if (updatedOrder) {
+       if (updatedOrder) {
 
-            let orders =
-                getOrders();
-
-
-            const index =
-                orders.findIndex(
-                    function (item) {
-
-                        return (
-                            String(item.id) ===
-                            String(orderId)
-                        );
-
-                    }
-                );
+    const latestOrder =
+        JSON.parse(
+            localStorage.getItem(
+                "latestOrder"
+            ) || "null"
+        );
 
 
-            if (index >= 0) {
+    if (
+        latestOrder &&
+        String(latestOrder.id) ===
+        String(orderId)
+    ) {
 
-                orders[index] =
-                    updatedOrder;
+        localStorage.setItem(
+            "latestOrder",
+            JSON.stringify(
+                updatedOrder
+            )
+        );
 
-            }
-            else {
-
-                orders.push(
-                    updatedOrder
-                );
-
-            }
-
-
-            localStorage.setItem(
-                "orders",
-                JSON.stringify(
-                    orders
-                )
-            );
-
-
-            const latestOrder =
-                JSON.parse(
-                    localStorage.getItem(
-                        "latestOrder"
-                    ) || "null"
-                );
-
-
-            if (
-                latestOrder &&
-                String(latestOrder.id) ===
-                String(orderId)
-            ) {
-
-                localStorage.setItem(
-                    "latestOrder",
-                    JSON.stringify(
-                        updatedOrder
-                    )
-                );
-
-            }
-
-        }
+    }
+}
 
 
         /* =========================================
