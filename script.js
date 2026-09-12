@@ -5924,6 +5924,183 @@ function copyAdminUpiId() {
 
         });
 }
+
+
+/* =====================================================
+   BUILD FRESH ORDER DATA FROM FIRESTORE
+===================================================== */
+
+async function buildFreshOrderData(cart) {
+
+    const orderBooks = [];
+
+    let total = 0;
+
+
+    for (const cartBook of cart) {
+
+        /* =========================================
+           GET LATEST BOOK
+        ========================================= */
+
+        const bookDoc =
+            await db.collection("books")
+                .doc(
+                    String(
+                        cartBook.id
+                    )
+                )
+                .get();
+
+
+        if (!bookDoc.exists) {
+
+            throw new Error(
+                cartBook.title +
+                " is no longer available."
+            );
+        }
+
+
+        const book =
+            bookDoc.data();
+
+
+        /* =========================================
+           QUANTITY
+        ========================================= */
+
+        const quantity =
+            Number(
+                cartBook.quantity
+            ) || 1;
+
+
+        if (
+            !Number.isInteger(quantity) ||
+            quantity <= 0
+        ) {
+
+            throw new Error(
+                "Invalid quantity for " +
+                (book.title || cartBook.title)
+            );
+        }
+
+
+        /* =========================================
+           LATEST STOCK
+        ========================================= */
+
+        const currentStock =
+            Number(
+                book.stock
+            ) || 0;
+
+
+        if (
+            quantity >
+            currentStock
+        ) {
+
+            throw new Error(
+                "Only " +
+                currentStock +
+                " copies of " +
+                (book.title || cartBook.title) +
+                " are available."
+            );
+        }
+
+
+        /* =========================================
+           LATEST PRICE
+        ========================================= */
+
+        const price =
+            Number(
+                book.price
+            );
+
+
+        if (
+            !Number.isFinite(price) ||
+            price <= 0
+        ) {
+
+            throw new Error(
+                "Invalid price for " +
+                (book.title || cartBook.title)
+            );
+        }
+
+
+        /* =========================================
+           CLEAN ORDER BOOK SNAPSHOT
+        ========================================= */
+
+        const orderBook = {
+
+            id:
+                book.id ||
+                bookDoc.id,
+
+            title:
+                book.title ||
+                cartBook.title ||
+                "Book",
+
+            author:
+                book.author || "",
+
+            price:
+                price,
+
+            category:
+                book.category || "",
+
+            image:
+                book.image || "",
+
+            quantity:
+                quantity
+
+        };
+
+
+        if (
+            Array.isArray(
+                book.subcategories
+            )
+        ) {
+
+            orderBook.subcategories =
+                book.subcategories;
+
+        }
+
+
+        orderBooks.push(
+            orderBook
+        );
+
+
+        total +=
+            price *
+            quantity;
+    }
+
+
+    return {
+
+        books:
+            orderBooks,
+
+        total:
+            total
+
+    };
+}
 //==========================================
 // Confirm Online Payment
 //===========================================
@@ -6120,6 +6297,38 @@ catch (error) {
     return;
 }
 
+   /* =========================================
+   GET FRESH PRICE + STOCK FOR FINAL ORDER
+========================================= */
+
+let freshOrderData;
+
+try {
+
+    freshOrderData =
+        await buildFreshOrderData(
+            cart
+        );
+
+}
+catch (error) {
+
+    console.error(
+        "UPI final order validation error:",
+        error
+    );
+
+
+    alert(
+        "Order could not be created.\n\n" +
+        error.message
+    );
+
+
+    await displayCart();
+
+    return;
+}
 
     // ==========================================
     // CREATE ORDER
@@ -6145,23 +6354,11 @@ catch (error) {
         address:
             customer.address,
 
-        books:
-            cart.map(function (book) {
+       books:
+    freshOrderData.books,
 
-                return {
-
-                    ...book,
-
-                    quantity:
-                        Number(book.quantity)
-                        || 1
-
-                };
-
-            }),
-
-        total:
-            calculateCartTotal(),
+       total:
+    freshOrderData.total,
 
         paymentMethod:
             "UPI",
@@ -6332,6 +6529,39 @@ async function processPayment() {
     }
 
 
+   /* =========================================
+   GET FRESH PRICE + STOCK FOR FINAL ORDER
+========================================= */
+
+let freshOrderData;
+
+try {
+
+    freshOrderData =
+        await buildFreshOrderData(
+            cart
+        );
+
+}
+catch (error) {
+
+    console.error(
+        "COD final order validation error:",
+        error
+    );
+
+
+    alert(
+        "Order could not be created.\n\n" +
+        error.message
+    );
+
+
+    await displayCart();
+
+    return;
+}
+   
     const order = {
 
         id:
@@ -6352,23 +6582,11 @@ async function processPayment() {
         address:
             customer.address,
 
-        books:
-            cart.map(
-                function (book) {
-
-                    return {
-
-                        ...book,
-
-                        quantity:
-                            Number(book.quantity)
-                            || 1
-                    };
-                }
-            ),
+      books:
+    freshOrderData.books,
 
         total:
-            calculateCartTotal(),
+    freshOrderData.total,
 
         paymentMethod:
             payment.value,
