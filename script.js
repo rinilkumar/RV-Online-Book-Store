@@ -1119,36 +1119,85 @@ async function managerLogin(event) {
         );
 
     }
-    catch (error) {
+  catch (error) {
 
-        console.error(
-            "Manager login error:",
-            error
+    console.error(
+        "Manager login error:",
+        error
+    );
+
+
+    if (
+        error.code ===
+        "auth/invalid-credential" ||
+        error.code ===
+        "auth/wrong-password" ||
+        error.code ===
+        "auth/user-not-found"
+    ) {
+
+        alert(
+            "Invalid Manager ID, email or password."
         );
 
-
-        if (
-            error.code ===
-                "auth/invalid-credential" ||
-            error.code ===
-                "auth/wrong-password" ||
-            error.code ===
-                "auth/user-not-found"
-        ) {
-
-            alert(
-                "Invalid Manager ID, email or password."
-            );
-
-        }
-        else {
-
-            alert(
-                "Manager login failed: " +
-                error.message
-            );
-        }
     }
+
+    else if (
+        error.code ===
+        "auth/invalid-email"
+    ) {
+
+        alert(
+            "Please enter a valid Manager email address."
+        );
+
+    }
+
+    else if (
+        error.code ===
+        "auth/user-disabled"
+    ) {
+
+        alert(
+            "This Firebase Manager account has been disabled."
+        );
+
+    }
+
+    else if (
+        error.code ===
+        "auth/too-many-requests"
+    ) {
+
+        alert(
+            "Too many failed Manager login attempts.\n\n" +
+            "Please try again later."
+        );
+
+    }
+
+    else if (
+        error.code ===
+        "auth/network-request-failed"
+    ) {
+
+        alert(
+            "Network error.\n\n" +
+            "Please check your internet connection."
+        );
+
+    }
+
+    else {
+
+        alert(
+            "Manager login failed.\n\n" +
+            error.message
+        );
+
+    }
+
+}
 }
 
 /* =====================================================
@@ -1604,20 +1653,28 @@ async function registerCustomer(event) {
 
         const customer = {
 
-            id: user.uid,
+    id:
+        user.uid,
 
-            name: name,
+    name:
+        name,
 
-            email: email,
+    email:
+        email,
 
-            phone: phone,
+    phone:
+        phone,
 
-            address: null,
+    address:
+        null,
 
-            registeredDate:
-                new Date().toLocaleString()
+    active:
+        true,
 
-        };
+    registeredDate:
+        new Date().toLocaleString()
+
+};
 
 
         /* SAVE PROFILE TO FIRESTORE */
@@ -1766,6 +1823,39 @@ async function customerLogin(event) {
         const customer =
             customerDoc.data();
 
+       /* =========================================
+   CHECK CUSTOMER ACCOUNT STATUS
+========================================= */
+
+if (customer.active === false) {
+
+    await auth.signOut();
+
+
+    localStorage.removeItem(
+        "currentCustomer"
+    );
+
+
+    alert(
+        "Your customer account has been deactivated.\n\n" +
+        "Please contact the Administrator."
+    );
+
+
+    showPage(
+        "accountPage"
+    );
+
+
+    showAccountForm(
+        "customerLoginForm"
+    );
+
+
+    return;
+}
+
 
         /* KEEP CURRENT CUSTOMER FOR EXISTING WEBSITE */
 
@@ -1799,32 +1889,83 @@ async function customerLogin(event) {
     }
     catch (error) {
 
-        console.error(
-            "Customer login error:",
-            error
+    console.error(
+        "Customer login error:",
+        error
+    );
+
+
+    if (
+        error.code ===
+        "auth/invalid-credential" ||
+        error.code ===
+        "auth/wrong-password" ||
+        error.code ===
+        "auth/user-not-found"
+    ) {
+
+        alert(
+            "Invalid email or password."
         );
 
+    }
 
-        if (
-            error.code ===
-            "auth/invalid-credential"
-        ) {
+    else if (
+        error.code ===
+        "auth/invalid-email"
+    ) {
 
-            alert(
-                "Invalid email or password."
-            );
-
-        }
-        else {
-
-            alert(
-                "Login failed: " +
-                error.message
-            );
-
-        }
+        alert(
+            "Please enter a valid email address."
+        );
 
     }
+
+    else if (
+        error.code ===
+        "auth/user-disabled"
+    ) {
+
+        alert(
+            "This customer account has been disabled."
+        );
+
+    }
+
+    else if (
+        error.code ===
+        "auth/too-many-requests"
+    ) {
+
+        alert(
+            "Too many failed login attempts.\n\n" +
+            "Please try again later or reset your password."
+        );
+
+    }
+
+    else if (
+        error.code ===
+        "auth/network-request-failed"
+    ) {
+
+        alert(
+            "Network error.\n\n" +
+            "Please check your internet connection and try again."
+        );
+
+    }
+
+    else {
+
+        alert(
+            "Customer login failed.\n\n" +
+            error.message
+        );
+
+    }
+
+}
 }
 /* =====================================================
    CUSTOMER LOGOUT - FIREBASE AUTH
@@ -2257,25 +2398,92 @@ async function adminLogin(event) {
     }
     catch (error) {
 
-        console.error(
-            "Admin login error:",
-            error
-        );
+    console.error(
+        "Admin login error:",
+        error
+    );
 
 
-        localStorage.removeItem(
-            "adminLoggedIn"
-        );
+    localStorage.removeItem(
+        "adminLoggedIn"
+    );
 
-        localStorage.removeItem(
-            "currentAdmin"
-        );
+    localStorage.removeItem(
+        "currentAdmin"
+    );
 
+
+    if (
+        error.code ===
+        "auth/invalid-credential" ||
+        error.code ===
+        "auth/wrong-password" ||
+        error.code ===
+        "auth/user-not-found"
+    ) {
 
         alert(
             "Invalid Admin email or password."
         );
+
     }
+
+    else if (
+        error.code ===
+        "auth/invalid-email"
+    ) {
+
+        alert(
+            "Please enter a valid Admin email address."
+        );
+
+    }
+
+    else if (
+        error.code ===
+        "auth/user-disabled"
+    ) {
+
+        alert(
+            "This Firebase Admin account has been disabled."
+        );
+
+    }
+
+    else if (
+        error.code ===
+        "auth/too-many-requests"
+    ) {
+
+        alert(
+            "Too many failed Admin login attempts.\n\n" +
+            "Please try again later."
+        );
+
+    }
+
+    else if (
+        error.code ===
+        "auth/network-request-failed"
+    ) {
+
+        alert(
+            "Network error.\n\n" +
+            "Please check your internet connection."
+        );
+
+    }
+
+    else {
+
+        alert(
+            "Admin login failed.\n\n" +
+            error.message
+        );
+
+    }
+
+}
 }
 
 /* =====================================================
@@ -13802,6 +14010,47 @@ function restoreCustomerSession() {
                             customerDoc.data().id ||
                             user.uid
                     };
+
+                   /* =====================================
+   CUSTOMER ACCOUNT DEACTIVATED
+===================================== */
+
+if (customer.active === false) {
+
+    localStorage.removeItem(
+        "currentCustomer"
+    );
+
+
+    try {
+
+        await auth.signOut();
+
+    }
+    catch (error) {
+
+        console.error(
+            "Customer automatic logout error:",
+            error
+        );
+    }
+
+
+    updateNavigation();
+
+
+    showPage(
+        "home"
+    );
+
+
+    alert(
+        "Your customer account has been deactivated."
+    );
+
+
+    return;
+}
 
 
                     localStorage.setItem(
