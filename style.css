@@ -25,6 +25,53 @@ body {
     min-height: 100vh;
 }
 
+
+/* ==========================================
+   FORGOT PASSWORD BUTTON-RESET PASSWORD
+========================================== */
+.forgot-password-btn {
+  /* Layout & Sizing */
+  display: block;
+  width: 100%;
+  padding: 12px 24px;
+  margin-top: 15px;
+
+  /* Typography */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+
+  /* Transparent Background & Borders */
+  background-color: transparent;
+  color: #007bff; /* Clean modern blue text */
+  border: 2px solid #007bff; /* Matching blue outline */
+  border-radius: 6px;
+
+  /* Smooth interactive transitions */
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease, transform 0.1s ease;
+}
+
+/* Hover effect: Background fills in, text changes to white */
+.forgot-password-btn:hover {
+  background-color: #007bff;
+  color: #ffffff;
+}
+
+/* Click effect when the user presses down */
+.forgot-password-btn:active {
+  transform: scale(0.98); /* Slight click shrinkage */
+}
+
+/* Focus indicator for keyboard accessibility */
+.forgot-password-btn:focus {
+  outline: 3px solid rgba(0, 123, 255, 0.4);
+  outline-offset: 2px;
+}
+
+
 /* =========================================
    MANAGER LOGOUT BUTTON - TOP RIGHT
 ========================================= */
