@@ -4780,32 +4780,36 @@ function calculateCartTotal() {
 
 
 /* =====================================================
-   DISPLAY CART
+   DISPLAY CART - LATEST FIRESTORE STOCK
 ===================================================== */
 
-function displayCart() {
+async function displayCart() {
 
     const container =
         document.getElementById(
             "cartItems"
         );
 
+
     if (!container) {
         return;
     }
 
 
-    const cart =
+    let cart =
         getCart();
 
 
     container.innerHTML = "";
 
 
+    /* =========================================
+       EMPTY CART
+    ========================================= */
+
     if (cart.length === 0) {
 
         container.innerHTML = `
-
             <div class="empty-message">
 
                 <h3>
@@ -4818,17 +4822,181 @@ function displayCart() {
 
             </div>
         `;
+
+
+        const total =
+            document.getElementById(
+                "cartTotal"
+            );
+
+
+        if (total) {
+            total.textContent = "0";
+        }
+
+
+        updateCartCount();
+
+        return;
     }
 
+
+    /* =========================================
+       LOAD LATEST BOOK DATA
+    ========================================= */
+
+    try {
+
+        for (
+            let index = 0;
+            index < cart.length;
+            index++
+        ) {
+
+            const cartBook =
+                cart[index];
+
+
+            const bookDoc =
+                await db.collection("books")
+                    .doc(
+                        String(
+                            cartBook.id
+                        )
+                    )
+                    .get();
+
+
+            /* =====================================
+               BOOK NO LONGER EXISTS
+            ===================================== */
+
+            if (!bookDoc.exists) {
+
+                cartBook.latestStock =
+                    0;
+
+                cartBook.unavailable =
+                    true;
+
+                continue;
+            }
+
+
+            const latestBook =
+                bookDoc.data();
+
+
+            /* =====================================
+               KEEP CART DATA FRESH
+            ===================================== */
+
+            cartBook.latestStock =
+                Number(
+                    latestBook.stock
+                ) || 0;
+
+
+            cartBook.stock =
+                cartBook.latestStock;
+
+
+            /*
+               Also refresh current price/title
+               from Firestore.
+            */
+
+            if (
+                latestBook.title !==
+                undefined
+            ) {
+
+                cartBook.title =
+                    latestBook.title;
+
+            }
+
+
+            if (
+                latestBook.price !==
+                undefined
+            ) {
+
+                cartBook.price =
+                    Number(
+                        latestBook.price
+                    );
+
+            }
+
+
+            cartBook.unavailable =
+                false;
+        }
+
+
+        /* =========================================
+           UPDATE CART CACHE
+        ========================================= */
+
+        localStorage.setItem(
+            "cart",
+            JSON.stringify(
+                cart
+            )
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Cart Firestore refresh error:",
+            error
+        );
+
+
+        container.innerHTML = `
+            <div class="empty-message">
+
+                <h3>
+                    Could not load latest stock.
+                </h3>
+
+                <p>
+                    Please check your connection
+                    and try again.
+                </p>
+
+            </div>
+        `;
+
+        return;
+    }
+
+
+    /* =========================================
+       DISPLAY CART ITEMS
+    ========================================= */
 
     cart.forEach(
         function (book, index) {
 
             const quantity =
-                Number(book.quantity) || 1;
+                Number(
+                    book.quantity
+                ) || 1;
+
+
+            const latestStock =
+                Number(
+                    book.latestStock
+                ) || 0;
+
 
             const subtotal =
-                Number(book.price) *
+                Number(
+                    book.price
+                ) *
                 quantity;
 
 
@@ -4837,8 +5005,70 @@ function displayCart() {
                     "div"
                 );
 
+
             item.className =
                 "cart-item";
+
+
+            /* =====================================
+               STOCK MESSAGE
+            ===================================== */
+
+            let stockMessage = "";
+
+
+            if (book.unavailable) {
+
+                stockMessage = `
+                    <p>
+                        <strong>
+                            Currently unavailable
+                        </strong>
+                    </p>
+                `;
+
+            }
+            else if (
+                latestStock === 0
+            ) {
+
+                stockMessage = `
+                    <p>
+                        <strong>
+                            Out of stock
+                        </strong>
+                    </p>
+                `;
+
+            }
+            else if (
+                quantity >
+                latestStock
+            ) {
+
+                stockMessage = `
+                    <p>
+                        <strong>
+                            Only ${latestStock}
+                            available.
+                            Please reduce quantity.
+                        </strong>
+                    </p>
+                `;
+
+            }
+            else {
+
+                stockMessage = `
+                    <p>
+                        Available:
+                        <strong>
+                            ${latestStock}
+                        </strong>
+                    </p>
+                `;
+
+            }
 
 
             item.innerHTML = `
@@ -4849,9 +5079,14 @@ function displayCart() {
                         ${book.title}
                     </h3>
 
+
                     <p>
                         ₹${book.price}
                     </p>
+
+
+                    ${stockMessage}
+
 
                     <div class="cart-quantity">
 
@@ -4861,26 +5096,38 @@ function displayCart() {
                             −
                         </button>
 
+
                         <strong>
                             ${quantity}
                         </strong>
 
+
                         <button
                             onclick="changeCartQuantity(${index}, 1)"
+                            ${
+                                book.unavailable ||
+                                latestStock === 0 ||
+                                quantity >= latestStock
+                                    ? "disabled"
+                                    : ""
+                            }
                         >
                             +
                         </button>
 
                     </div>
 
+
                     <p>
                         Subtotal:
+
                         <strong>
                             ₹${subtotal}
                         </strong>
                     </p>
 
                 </div>
+
 
                 <button
                     class="remove-btn"
@@ -4894,9 +5141,14 @@ function displayCart() {
             container.appendChild(
                 item
             );
+
         }
     );
 
+
+    /* =========================================
+       CART TOTAL
+    ========================================= */
 
     const total =
         document.getElementById(
@@ -4908,6 +5160,7 @@ function displayCart() {
 
         total.textContent =
             calculateCartTotal();
+
     }
 
 
@@ -4916,10 +5169,10 @@ function displayCart() {
 
 
 /* =====================================================
-   CHANGE CART QUANTITY
+   CHANGE CART QUANTITY - FIRESTORE STOCK
 ===================================================== */
 
-function changeCartQuantity(
+async function changeCartQuantity(
     index,
     amount
 ) {
@@ -4933,66 +5186,150 @@ function changeCartQuantity(
     }
 
 
-    const books =
-        getBooks();
+    try {
+
+        const cartBook =
+            cart[index];
 
 
-    const book =
-        books.find(
-            function (item) {
+        /* GET LATEST BOOK */
 
-                return (
-                    String(item.id) ===
-                    String(cart[index].id)
+        const bookDoc =
+            await db.collection("books")
+                .doc(
+                    String(
+                        cartBook.id
+                    )
+                )
+                .get();
+
+
+        if (!bookDoc.exists) {
+
+            alert(
+                cartBook.title +
+                " is no longer available."
+            );
+
+            await displayCart();
+
+            return;
+        }
+
+
+        const book =
+            bookDoc.data();
+
+
+        const latestStock =
+            Number(
+                book.stock
+            ) || 0;
+
+
+        let quantity =
+            Number(
+                cartBook.quantity
+            ) || 1;
+
+
+        quantity +=
+            Number(amount);
+
+
+        /* MINIMUM QUANTITY */
+
+        if (quantity < 1) {
+
+            quantity = 1;
+
+        }
+
+
+        /* CHECK LATEST STOCK */
+
+        if (
+            quantity >
+            latestStock
+        ) {
+
+            alert(
+                "Only " +
+                latestStock +
+                " copies of " +
+                (book.title || cartBook.title) +
+                " are available."
+            );
+
+            await displayCart();
+
+            return;
+        }
+
+
+        /* UPDATE CART */
+
+        cart[index].quantity =
+            quantity;
+
+
+        cart[index].stock =
+            latestStock;
+
+
+        cart[index].latestStock =
+            latestStock;
+
+
+        if (
+            book.price !==
+            undefined
+        ) {
+
+            cart[index].price =
+                Number(
+                    book.price
                 );
-            }
+
+        }
+
+
+        if (
+            book.title !==
+            undefined
+        ) {
+
+            cart[index].title =
+                book.title;
+
+        }
+
+
+        localStorage.setItem(
+            "cart",
+            JSON.stringify(
+                cart
+            )
         );
 
 
-    if (!book) {
-        return;
+        await displayCart();
+
     }
+    catch (error) {
 
+        console.error(
+            "Cart quantity update error:",
+            error
+        );
 
-    let quantity =
-        Number(cart[index].quantity)
-        || 1;
-
-
-    quantity += amount;
-
-
-    if (quantity < 1) {
-        quantity = 1;
-    }
-
-
-    if (
-        quantity >
-        Number(book.stock)
-    ) {
 
         alert(
-            "Only " +
-            book.stock +
-            " available."
+            "Could not check the latest stock.\n\n" +
+            "Please check your connection and try again."
         );
 
-        return;
     }
-
-
-    cart[index].quantity =
-        quantity;
-
-
-    localStorage.setItem(
-        "cart",
-        JSON.stringify(cart)
-    );
-
-
-    displayCart();
 }
 
 
