@@ -1651,7 +1651,7 @@ async function registerCustomer(event) {
 
         /* CUSTOMER PROFILE */
 
-        const customer = {
+      const customer = {
 
     id:
         user.uid,
@@ -1667,9 +1667,6 @@ async function registerCustomer(event) {
 
     address:
         null,
-
-    active:
-        true,
 
     registeredDate:
         new Date().toLocaleString()
@@ -1823,38 +1820,7 @@ async function customerLogin(event) {
         const customer =
             customerDoc.data();
 
-       /* =========================================
-   CHECK CUSTOMER ACCOUNT STATUS
-========================================= */
-
-if (customer.active === false) {
-
-    await auth.signOut();
-
-
-    localStorage.removeItem(
-        "currentCustomer"
-    );
-
-
-    alert(
-        "Your customer account has been deactivated.\n\n" +
-        "Please contact the Administrator."
-    );
-
-
-    showPage(
-        "accountPage"
-    );
-
-
-    showAccountForm(
-        "customerLoginForm"
-    );
-
-
-    return;
-}
+ 
 
 
         /* KEEP CURRENT CUSTOMER FOR EXISTING WEBSITE */
@@ -14566,46 +14532,7 @@ function restoreCustomerSession() {
                             user.uid
                     };
 
-                   /* =====================================
-   CUSTOMER ACCOUNT DEACTIVATED
-===================================== */
-
-if (customer.active === false) {
-
-    localStorage.removeItem(
-        "currentCustomer"
-    );
-
-
-    try {
-
-        await auth.signOut();
-
-    }
-    catch (error) {
-
-        console.error(
-            "Customer automatic logout error:",
-            error
-        );
-    }
-
-
-    updateNavigation();
-
-
-    showPage(
-        "home"
-    );
-
-
-    alert(
-        "Your customer account has been deactivated."
-    );
-
-
-    return;
-}
+      
 
 
                     localStorage.setItem(
