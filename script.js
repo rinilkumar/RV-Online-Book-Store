@@ -1433,6 +1433,113 @@ function togglePassword(inputId, button) {
     }
 }
 
+/* =====================================================
+   STEP 10D-1
+   FIREBASE PASSWORD RESET
+===================================================== */
+
+async function resetPassword() {
+
+    const loginEmail =
+        document.getElementById(
+            "loginEmail"
+        );
+
+
+    if (!loginEmail) {
+
+        alert(
+            "Customer email field was not found."
+        );
+
+        return;
+    }
+
+
+    const email =
+        loginEmail.value
+            .trim()
+            .toLowerCase();
+
+
+    if (!email) {
+
+        alert(
+            "Please enter your email address first."
+        );
+
+        loginEmail.focus();
+
+        return;
+    }
+
+
+    try {
+
+        await auth
+            .sendPasswordResetEmail(
+                email
+            );
+
+
+        alert(
+            "Password reset email sent successfully.\n\n" +
+            "Please check your email inbox."
+        );
+
+
+        console.log(
+            "Password reset email sent:",
+            email
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Password reset error:",
+            error
+        );
+
+
+        if (
+            error.code ===
+            "auth/invalid-email"
+        ) {
+
+            alert(
+                "Please enter a valid email address."
+            );
+
+        }
+        else if (
+            error.code ===
+            "auth/user-not-found"
+        ) {
+
+            /*
+               Keep the message general instead of
+               revealing whether an account exists.
+            */
+
+            alert(
+                "If an account exists for this email, " +
+                "a password reset email will be sent."
+            );
+
+        }
+        else {
+
+            alert(
+                "Password reset could not be completed.\n\n" +
+                error.message
+            );
+
+        }
+
+    }
+}
+
 
 /* =====================================================
    CUSTOMER REGISTER - FIREBASE AUTH + FIRESTORE
