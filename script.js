@@ -76,13 +76,18 @@ function getCart() {
     ) || [];
 }
 
+/* =====================================================
+   CATEGORY RUNTIME CACHE
+===================================================== */
+
+let categoriesCache = [];
+
+
 function getCategories() {
 
-    return JSON.parse(
-        localStorage.getItem("categories")
-    ) || [];
-}
+    return categoriesCache.slice();
 
+}
 /* =====================================================
    SUBCATEGORY RUNTIME CACHE
 ===================================================== */
@@ -116,9 +121,26 @@ function getCurrentManager() {
 
 function isManagerLoggedIn() {
 
+    const user =
+        auth.currentUser;
+
+    const currentManager =
+        getCurrentManager();
+
+
+    if (
+        !user ||
+        !currentManager
+    ) {
+        return false;
+    }
+
+
     return (
-        localStorage.getItem("managerLoggedIn")
-        === "true"
+        String(
+            currentManager.uid || ""
+        ) ===
+        String(user.uid)
     );
 }
 
@@ -237,10 +259,6 @@ function startManagerProfileSync() {
 
                     localStorage.removeItem(
                         "currentManager"
-                    );
-
-                    localStorage.removeItem(
-                        "managerLoggedIn"
                     );
 
 
@@ -399,28 +417,16 @@ function restoreManagerSession() {
     auth.onAuthStateChanged(
         function (user) {
 
-            /*
-               Only restore if this browser already
-               contains a Manager login session.
-            */
+            const currentManager =
+                getCurrentManager();
 
-            if (
-                !isManagerLoggedIn() ||
-                !getCurrentManager()
-            ) {
 
-                return;
-            }
-
+            /* NO FIREBASE USER */
 
             if (!user) {
 
                 localStorage.removeItem(
                     "currentManager"
-                );
-
-                localStorage.removeItem(
-                    "managerLoggedIn"
                 );
 
                 updateNavigation();
@@ -429,7 +435,37 @@ function restoreManagerSession() {
             }
 
 
+            /* NOT A SAVED MANAGER SESSION */
+
+            if (!currentManager) {
+
+                return;
+            }
+
+
+            /* WRONG USER / OLD MANAGER SESSION */
+
+            if (
+                String(
+                    currentManager.uid || ""
+                ) !==
+                String(user.uid)
+            ) {
+
+                localStorage.removeItem(
+                    "currentManager"
+                );
+
+                updateNavigation();
+
+                return;
+            }
+
+
+            /* VALID MANAGER SESSION */
+
             startManagerProfileSync();
+
         }
     );
 }
@@ -881,11 +917,6 @@ async function managerLogin(event) {
         );
 
 
-        localStorage.setItem(
-            "managerLoggedIn",
-            "true"
-        );
-
        startManagerProfileSync();
 
 
@@ -1025,10 +1056,6 @@ async function managerLogout() {
 
         localStorage.removeItem(
             "currentManager"
-        );
-
-        localStorage.removeItem(
-            "managerLoggedIn"
         );
 
 
@@ -6316,12 +6343,7 @@ try {
 
 
 
-    // Save latest order for receipt
-
-    localStorage.setItem(
-        "latestOrder",
-        JSON.stringify(order)
-    );
+   
 
 }
 catch (error) {
@@ -6511,9 +6533,6 @@ date:
         .toLocaleString()
     };
 
-let orders =
-    getOrders();
-
 
 // ==========================================
 // SAVE COD ORDER TO FIRESTORE
@@ -6546,12 +6565,7 @@ catch (error) {
     return;
 }
 
-
-
-    localStorage.setItem(
-        "latestOrder",
-        JSON.stringify(order)
-    );
+   
 
 
     localStorage.setItem(
@@ -8196,8 +8210,15 @@ async function managerVerifyPayment(orderId) {
                 }
 
 
-                const manager =
-                    managerDoc.data();
+                const manager = {
+
+    ...managerDoc.data(),
+
+    uid:
+        managerDoc.data().uid ||
+        managerDoc.id
+
+};
 
 
                 if (
@@ -8451,58 +8472,8 @@ async function managerVerifyPayment(orderId) {
         );
 
 
-        console.log(
-            "Manager UPI payment verified atomically:",
-            orderId
-        );
 
-
-        /* =========================================
-           LOAD UPDATED ORDER
-        ========================================= */
-
-        const updatedDoc =
-            await orderRef.get();
-
-
-        const updatedOrder =
-            updatedDoc.exists
-                ? {
-                    ...updatedDoc.data(),
-
-                    id:
-                        updatedDoc.data().id ||
-                        updatedDoc.id
-                }
-                : null;
-
-
-        if (updatedOrder) {
-
-    const latestOrder =
-        JSON.parse(
-            localStorage.getItem(
-                "latestOrder"
-            ) || "null"
-        );
-
-
-    if (
-        latestOrder &&
-        String(latestOrder.id) ===
-        String(orderId)
-    ) {
-
-        localStorage.setItem(
-            "latestOrder",
-            JSON.stringify(
-                updatedOrder
-            )
-        );
-
-    }
-}
-
+     
 
         /* =========================================
            REFRESH WEBSITE
@@ -8896,55 +8867,6 @@ async function managerRejectPayment(orderId) {
         );
 
 
-        /* =========================================
-           LOAD UPDATED ORDER
-        ========================================= */
-
-        const updatedDoc =
-            await orderRef.get();
-
-
-        const updatedOrder =
-            updatedDoc.exists
-                ? {
-                    ...updatedDoc.data(),
-
-                    id:
-                        updatedDoc.data().id ||
-                        updatedDoc.id
-                }
-                : null;
-
-
-        /* =========================================
-           UPDATE LOCAL CACHE
-        ========================================= */
-
-      if (updatedOrder) {
-
-    const latestOrder =
-        JSON.parse(
-            localStorage.getItem(
-                "latestOrder"
-            ) || "null"
-        );
-
-
-    if (
-        latestOrder &&
-        String(latestOrder.id) ===
-        String(orderId)
-    ) {
-
-        localStorage.setItem(
-            "latestOrder",
-            JSON.stringify(
-                updatedOrder
-            )
-        );
-
-    }
-}
 
 
         /* =========================================
@@ -13940,56 +13862,6 @@ async function verifyOrderPayment(orderId) {
         );
 
 
-        /* =========================================
-           GET UPDATED ORDER
-        ========================================= */
-
-        const updatedDoc =
-            await orderRef.get();
-
-
-        const updatedOrder =
-            updatedDoc.exists
-                ? {
-                    ...updatedDoc.data(),
-
-                    id:
-                        updatedDoc.data().id ||
-                        updatedDoc.id
-                }
-                : null;
-
-
-        /* =========================================
-           UPDATE LOCAL ORDER CACHE
-        ========================================= */
-
-        if (updatedOrder) {
-
-    const latestOrder =
-        JSON.parse(
-            localStorage.getItem(
-                "latestOrder"
-            ) || "null"
-        );
-
-
-    if (
-        latestOrder &&
-        String(latestOrder.id) ===
-        String(orderId)
-    ) {
-
-        localStorage.setItem(
-            "latestOrder",
-            JSON.stringify(
-                updatedOrder
-            )
-        );
-
-    }
-}
-
 
         /* =========================================
            REFRESH WEBSITE
@@ -14241,56 +14113,10 @@ async function rejectOrderPayment(orderId) {
         );
 
 
-        /* =========================================
-           LOAD UPDATED ORDER
-        ========================================= */
-
-        const updatedDoc =
-            await orderRef.get();
+   
 
 
-        const updatedOrder =
-            updatedDoc.exists
-                ? {
-                    ...updatedDoc.data(),
-
-                    id:
-                        updatedDoc.data().id ||
-                        updatedDoc.id
-                }
-                : null;
-
-
-        /* =========================================
-           UPDATE LOCAL CACHE
-        ========================================= */
-
-       if (updatedOrder) {
-
-    const latestOrder =
-        JSON.parse(
-            localStorage.getItem(
-                "latestOrder"
-            ) || "null"
-        );
-
-
-    if (
-        latestOrder &&
-        String(latestOrder.id) ===
-        String(orderId)
-    ) {
-
-        localStorage.setItem(
-            "latestOrder",
-            JSON.stringify(
-                updatedOrder
-            )
-        );
-
-    }
-}
-
+    
 
         /* =========================================
            REFRESH WEBSITE
