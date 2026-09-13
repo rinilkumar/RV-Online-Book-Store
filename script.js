@@ -402,65 +402,41 @@ localStorage.setItem(
 
 
 /* =====================================================
-   RESTORE MANAGER FIREBASE SESSION
+   RESTORE MANAGER SESSION
 ===================================================== */
 
-function restoreManagerSession() {
+function restoreManagerSession(user) {
 
-    auth.onAuthStateChanged(
-        function (user) {
-
-            const currentManager =
-                getCurrentManager();
+    const currentManager =
+        getCurrentManager();
 
 
-            /* NO FIREBASE USER */
-
-            if (!user) {
-
-                localStorage.removeItem(
-                    "currentManager"
-                );
-
-                updateNavigation();
-
-                return;
-            }
+    if (
+        !user ||
+        !currentManager
+    ) {
+        return false;
+    }
 
 
-            /* NOT A SAVED MANAGER SESSION */
+    if (
+        String(
+            currentManager.uid || ""
+        ) !==
+        String(user.uid)
+    ) {
 
-            if (!currentManager) {
+        localStorage.removeItem(
+            "currentManager"
+        );
 
-                return;
-            }
-
-
-            /* WRONG USER / OLD MANAGER SESSION */
-
-            if (
-                String(
-                    currentManager.uid || ""
-                ) !==
-                String(user.uid)
-            ) {
-
-                localStorage.removeItem(
-                    "currentManager"
-                );
-
-                updateNavigation();
-
-                return;
-            }
+        return false;
+    }
 
 
-            /* VALID MANAGER SESSION */
+    startManagerProfileSync();
 
-            startManagerProfileSync();
-
-        }
-    );
+    return true;
 }
 
 /* =====================================================
@@ -2365,175 +2341,118 @@ function isAdminLoggedIn() {
 
 
 /* =====================================================
-   RESTORE ADMIN FIREBASE SESSION
+   RESTORE ADMIN SESSION
 ===================================================== */
 
-function restoreAdminSession() {
+async function restoreAdminSession(user) {
 
-    auth.onAuthStateChanged(
-        async function (user) {
-
-            const savedAdmin =
-                getCurrentAdmin();
+    const savedAdmin =
+        getCurrentAdmin();
 
 
-            /* =========================================
-               NO FIREBASE USER
-            ========================================= */
-
-            if (!user) {
-
-                localStorage.removeItem(
-                    "currentAdmin"
-                );
-
-                updateNavigation();
-
-                return;
-            }
+    if (!user || !savedAdmin) {
+        return false;
+    }
 
 
-            /* =========================================
-               NO SAVED ADMIN SESSION
-            ========================================= */
+    if (
+        String(
+            savedAdmin.uid || ""
+        ) !==
+        String(user.uid)
+    ) {
 
-            if (!savedAdmin) {
+        localStorage.removeItem(
+            "currentAdmin"
+        );
 
-                return;
-            }
-
-
-            /* =========================================
-               SAVED ADMIN BELONGS TO DIFFERENT USER
-            ========================================= */
-
-            if (
-                String(savedAdmin.uid || "") !==
-                String(user.uid)
-            ) {
-
-                localStorage.removeItem(
-                    "currentAdmin"
-                );
-
-                updateNavigation();
-
-                return;
-            }
+        return false;
+    }
 
 
-            try {
+    try {
 
-                /* =====================================
-                   LOAD ADMIN PROFILE FROM FIRESTORE
-                ===================================== */
-
-                const adminDoc =
-                    await db.collection("admins")
-                        .doc(user.uid)
-                        .get();
+        const adminDoc =
+            await db.collection("admins")
+                .doc(user.uid)
+                .get();
 
 
-                /* =====================================
-                   ADMIN PROFILE REMOVED
-                ===================================== */
+        if (!adminDoc.exists) {
 
-                if (!adminDoc.exists) {
+            localStorage.removeItem(
+                "currentAdmin"
+            );
 
-                    localStorage.removeItem(
-                        "currentAdmin"
-                    );
-
-                    await auth.signOut();
-
-                    updateNavigation();
-
-                    console.warn(
-                        "Admin profile not found."
-                    );
-
-                    return;
-                }
-
-
-                const admin =
-                    adminDoc.data();
-
-
-                /* =====================================
-                   VERIFY ADMIN ACCESS
-                ===================================== */
-
-                if (
-                    admin.role !== "admin" ||
-                    admin.active !== true
-                ) {
-
-                    localStorage.removeItem(
-                        "currentAdmin"
-                    );
-
-                    await auth.signOut();
-
-                    updateNavigation();
-
-                    console.warn(
-                        "Admin access is not active."
-                    );
-
-                    return;
-                }
-
-
-                /* =====================================
-                   RESTORE VALID ADMIN SESSION
-                ===================================== */
-
-                const currentAdmin = {
-
-                    uid:
-                        user.uid,
-
-                    name:
-                        admin.name || "Admin",
-
-                    email:
-                        user.email,
-
-                    role:
-                        "admin",
-
-                    active:
-                        true
-                };
-
-
-                localStorage.setItem(
-                    "currentAdmin",
-                    JSON.stringify(
-                        currentAdmin
-                    )
-                );
-
-
-                console.log(
-                    "Admin session restored:",
-                    currentAdmin.email
-                );
-
-
-                updateNavigation();
-
-            }
-            catch (error) {
-
-                console.error(
-                    "Admin session restore error:",
-                    error
-                );
-            }
+            return false;
         }
-    );
+
+
+        const admin =
+            adminDoc.data();
+
+
+        if (
+            admin.role !== "admin" ||
+            admin.active !== true
+        ) {
+
+            localStorage.removeItem(
+                "currentAdmin"
+            );
+
+            return false;
+        }
+
+
+        const currentAdmin = {
+
+            uid:
+                user.uid,
+
+            name:
+                admin.name || "Admin",
+
+            email:
+                user.email,
+
+            role:
+                "admin",
+
+            active:
+                true
+
+        };
+
+
+        localStorage.setItem(
+            "currentAdmin",
+            JSON.stringify(
+                currentAdmin
+            )
+        );
+
+
+        console.log(
+            "Admin session restored:",
+            currentAdmin.email
+        );
+
+
+        updateNavigation();
+
+        return true;
+
+    }
+    catch (error) {
+
+        console.error(
+            "Admin session restore error:",
+            error
+        );
+
+        return false;
+    }
 }
 
 /* =====================================================
@@ -14216,19 +14135,147 @@ async function loadCategoriesFromFirestore() {
 
 
 /* =====================================================
-   RESTORE CUSTOMER FIREBASE SESSION
+   RESTORE CUSTOMER SESSION
 ===================================================== */
 
-function restoreCustomerSession() {
+async function restoreCustomerSession(user) {
+
+    const savedCustomer =
+        getCurrentCustomer();
+
+
+    if (!user || !savedCustomer) {
+        return false;
+    }
+
+
+    const customerUid =
+        savedCustomer.id ||
+        savedCustomer.uid ||
+        "";
+
+
+    if (
+        String(customerUid) !==
+        String(user.uid)
+    ) {
+
+        localStorage.removeItem(
+            "currentCustomer"
+        );
+
+        return false;
+    }
+
+
+    try {
+
+        const customerDoc =
+            await db.collection("customers")
+                .doc(user.uid)
+                .get();
+
+
+        if (!customerDoc.exists) {
+
+            localStorage.removeItem(
+                "currentCustomer"
+            );
+
+            return false;
+        }
+
+
+        const customer = {
+
+            ...customerDoc.data(),
+
+            id:
+                customerDoc.data().id ||
+                user.uid
+
+        };
+
+
+        localStorage.setItem(
+            "currentCustomer",
+            JSON.stringify(customer)
+        );
+
+
+        console.log(
+            "Customer session restored:",
+            customer
+        );
+
+
+        updateNavigation();
+
+        return true;
+
+    }
+    catch (error) {
+
+        console.error(
+            "Customer session restore error:",
+            error
+        );
+
+        return false;
+    }
+}
+
+/* =====================================================
+   SINGLE FIREBASE AUTH SESSION OBSERVER
+===================================================== */
+
+let authSessionObserverStarted =
+    false;
+
+
+function startAuthSessionObserver() {
+
+    if (authSessionObserverStarted) {
+        return;
+    }
+
+
+    authSessionObserverStarted =
+        true;
+
 
     auth.onAuthStateChanged(
         async function (user) {
 
+            /* =========================================
+               USER SIGNED OUT
+            ========================================= */
+
             if (!user) {
+
+                if (
+                    managerProfileUnsubscribe
+                ) {
+
+                    managerProfileUnsubscribe();
+
+                    managerProfileUnsubscribe =
+                        null;
+                }
+
 
                 localStorage.removeItem(
                     "currentCustomer"
                 );
+
+                localStorage.removeItem(
+                    "currentManager"
+                );
+
+                localStorage.removeItem(
+                    "currentAdmin"
+                );
+
 
                 updateNavigation();
 
@@ -14236,73 +14283,97 @@ function restoreCustomerSession() {
             }
 
 
-            try {
+            const currentAdmin =
+                getCurrentAdmin();
 
-                const customerDoc =
-                    await db.collection("customers")
-                        .doc(user.uid)
-                        .get();
+            const currentManager =
+                getCurrentManager();
 
-
-                /* =====================================
-                   AUTH USER IS A CUSTOMER
-                ===================================== */
-
-                if (customerDoc.exists) {
-
-                    const customer = {
-
-                        ...customerDoc.data(),
-
-                        id:
-                            customerDoc.data().id ||
-                            user.uid
-                    };
-
-      
+            const currentCustomer =
+                getCurrentCustomer();
 
 
-                    localStorage.setItem(
-                        "currentCustomer",
-                        JSON.stringify(customer)
-                    );
+            /* =========================================
+               ADMIN SESSION
+            ========================================= */
 
+            if (
+                currentAdmin &&
+                String(
+                    currentAdmin.uid || ""
+                ) ===
+                String(user.uid)
+            ) {
 
-                    console.log(
-                        "Customer session restored:",
-                        customer
-                    );
-
-
-                    updateNavigation();
-
-                    return;
-                }
-
-
-                /*
-                   Firebase user may be a Manager,
-                   not a Customer.
-
-                   Prevent an old Customer profile
-                   remaining in localStorage.
-                */
-
-                localStorage.removeItem(
-                    "currentCustomer"
+                await restoreAdminSession(
+                    user
                 );
 
-
-                updateNavigation();
-
+                return;
             }
-            catch (error) {
 
-                console.error(
-                    "Customer session restore error:",
-                    error
+
+            /* =========================================
+               MANAGER SESSION
+            ========================================= */
+
+            if (
+                currentManager &&
+                String(
+                    currentManager.uid || ""
+                ) ===
+                String(user.uid)
+            ) {
+
+                restoreManagerSession(
+                    user
                 );
+
+                return;
             }
+
+
+            /* =========================================
+               CUSTOMER SESSION
+            ========================================= */
+
+            if (
+                currentCustomer &&
+                String(
+                    currentCustomer.id ||
+                    currentCustomer.uid ||
+                    ""
+                ) ===
+                String(user.uid)
+            ) {
+
+                await restoreCustomerSession(
+                    user
+                );
+
+                return;
+            }
+
+
+            /* =========================================
+               REMOVE STALE ROLE COPIES
+            ========================================= */
+
+            localStorage.removeItem(
+                "currentCustomer"
+            );
+
+            localStorage.removeItem(
+                "currentManager"
+            );
+
+            localStorage.removeItem(
+                "currentAdmin"
+            );
+
+
+            updateNavigation();
+
         }
     );
 }
