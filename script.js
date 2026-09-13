@@ -405,7 +405,7 @@ localStorage.setItem(
    RESTORE MANAGER SESSION
 ===================================================== */
 
-function restoreManagerSession(user) {
+async function restoreManagerSession(user) {
 
     const currentManager =
         getCurrentManager();
@@ -434,9 +434,69 @@ function restoreManagerSession(user) {
     }
 
 
-    startManagerProfileSync();
+    try {
 
-    return true;
+        const managerDoc =
+            await db.collection("managers")
+                .doc(user.uid)
+                .get();
+
+
+        if (!managerDoc.exists) {
+
+            localStorage.removeItem(
+                "currentManager"
+            );
+
+            return false;
+        }
+
+
+        const manager = {
+
+            ...managerDoc.data(),
+
+            uid:
+                managerDoc.id
+
+        };
+
+
+        if (
+            manager.status !==
+            "Approved"
+        ) {
+
+            localStorage.removeItem(
+                "currentManager"
+            );
+
+            return false;
+        }
+
+
+        localStorage.setItem(
+            "currentManager",
+            JSON.stringify(manager)
+        );
+
+
+        startManagerProfileSync();
+
+        updateNavigation();
+
+        return true;
+
+    }
+    catch (error) {
+
+        console.error(
+            "Manager session restore error:",
+            error
+        );
+
+        return false;
+    }
 }
 
 /* =====================================================
@@ -2454,6 +2514,7 @@ async function restoreAdminSession(user) {
         return false;
     }
 }
+
 
 /* =====================================================
    ADMIN LOGOUT - FIREBASE
@@ -14229,153 +14290,208 @@ async function restoreCustomerSession(user) {
    SINGLE FIREBASE AUTH SESSION OBSERVER
 ===================================================== */
 
-let authSessionObserverStarted =
-    false;
+let authInitialRestorePromise =
+    null;
 
 
 function startAuthSessionObserver() {
 
-    if (authSessionObserverStarted) {
-        return;
+    if (authInitialRestorePromise) {
+
+        return authInitialRestorePromise;
     }
 
 
-    authSessionObserverStarted =
-        true;
+    authInitialRestorePromise =
+        new Promise(
+            function (resolve) {
+
+                let initialRestoreFinished =
+                    false;
 
 
-    auth.onAuthStateChanged(
-        async function (user) {
+                function finishInitialRestore() {
 
-            /* =========================================
-               USER SIGNED OUT
-            ========================================= */
+                    if (
+                        initialRestoreFinished
+                    ) {
+                        return;
+                    }
 
-            if (!user) {
 
-                if (
-                    managerProfileUnsubscribe
-                ) {
+                    initialRestoreFinished =
+                        true;
 
-                    managerProfileUnsubscribe();
-
-                    managerProfileUnsubscribe =
-                        null;
+                    resolve();
                 }
 
 
-                localStorage.removeItem(
-                    "currentCustomer"
+                auth.onAuthStateChanged(
+
+                    async function (user) {
+
+                        try {
+
+                            /* =================================
+                               USER SIGNED OUT
+                            ================================= */
+
+                            if (!user) {
+
+                                if (
+                                    managerProfileUnsubscribe
+                                ) {
+
+                                    managerProfileUnsubscribe();
+
+                                    managerProfileUnsubscribe =
+                                        null;
+                                }
+
+
+                                localStorage.removeItem(
+                                    "currentCustomer"
+                                );
+
+                                localStorage.removeItem(
+                                    "currentManager"
+                                );
+
+                                localStorage.removeItem(
+                                    "currentAdmin"
+                                );
+
+
+                                updateNavigation();
+
+                                return;
+                            }
+
+
+                            const currentAdmin =
+                                getCurrentAdmin();
+
+                            const currentManager =
+                                getCurrentManager();
+
+                            const currentCustomer =
+                                getCurrentCustomer();
+
+
+                            /* =================================
+                               ADMIN SESSION
+                            ================================= */
+
+                            if (
+                                currentAdmin &&
+                                String(
+                                    currentAdmin.uid ||
+                                    ""
+                                ) ===
+                                String(user.uid)
+                            ) {
+
+                                await restoreAdminSession(
+                                    user
+                                );
+
+                                return;
+                            }
+
+
+                            /* =================================
+                               MANAGER SESSION
+                            ================================= */
+
+                            if (
+                                currentManager &&
+                                String(
+                                    currentManager.uid ||
+                                    ""
+                                ) ===
+                                String(user.uid)
+                            ) {
+
+                                await restoreManagerSession(
+                                    user
+                                );
+
+                                return;
+                            }
+
+
+                            /* =================================
+                               CUSTOMER SESSION
+                            ================================= */
+
+                            if (
+                                currentCustomer &&
+                                String(
+                                    currentCustomer.id ||
+                                    currentCustomer.uid ||
+                                    ""
+                                ) ===
+                                String(user.uid)
+                            ) {
+
+                                await restoreCustomerSession(
+                                    user
+                                );
+
+                                return;
+                            }
+
+
+                            /* =================================
+                               REMOVE STALE ROLE COPIES
+                            ================================= */
+
+                            localStorage.removeItem(
+                                "currentCustomer"
+                            );
+
+                            localStorage.removeItem(
+                                "currentManager"
+                            );
+
+                            localStorage.removeItem(
+                                "currentAdmin"
+                            );
+
+
+                            updateNavigation();
+
+                        }
+                        catch (error) {
+
+                            console.error(
+                                "Auth session restore error:",
+                                error
+                            );
+                        }
+                        finally {
+
+                            finishInitialRestore();
+                        }
+                    },
+
+
+                    function (error) {
+
+                        console.error(
+                            "Firebase Auth observer error:",
+                            error
+                        );
+
+                        finishInitialRestore();
+                    }
+
                 );
-
-                localStorage.removeItem(
-                    "currentManager"
-                );
-
-                localStorage.removeItem(
-                    "currentAdmin"
-                );
-
-
-                updateNavigation();
-
-                return;
             }
+        );
 
 
-            const currentAdmin =
-                getCurrentAdmin();
-
-            const currentManager =
-                getCurrentManager();
-
-            const currentCustomer =
-                getCurrentCustomer();
-
-
-            /* =========================================
-               ADMIN SESSION
-            ========================================= */
-
-            if (
-                currentAdmin &&
-                String(
-                    currentAdmin.uid || ""
-                ) ===
-                String(user.uid)
-            ) {
-
-                await restoreAdminSession(
-                    user
-                );
-
-                return;
-            }
-
-
-            /* =========================================
-               MANAGER SESSION
-            ========================================= */
-
-            if (
-                currentManager &&
-                String(
-                    currentManager.uid || ""
-                ) ===
-                String(user.uid)
-            ) {
-
-                restoreManagerSession(
-                    user
-                );
-
-                return;
-            }
-
-
-            /* =========================================
-               CUSTOMER SESSION
-            ========================================= */
-
-            if (
-                currentCustomer &&
-                String(
-                    currentCustomer.id ||
-                    currentCustomer.uid ||
-                    ""
-                ) ===
-                String(user.uid)
-            ) {
-
-                await restoreCustomerSession(
-                    user
-                );
-
-                return;
-            }
-
-
-            /* =========================================
-               REMOVE STALE ROLE COPIES
-            ========================================= */
-
-            localStorage.removeItem(
-                "currentCustomer"
-            );
-
-            localStorage.removeItem(
-                "currentManager"
-            );
-
-            localStorage.removeItem(
-                "currentAdmin"
-            );
-
-
-            updateNavigation();
-
-        }
-    );
+    return authInitialRestorePromise;
 }
 
 /* =====================================================
@@ -14398,12 +14514,12 @@ document.addEventListener(
 
        restoreAdminSession();
 
-        loadCategoryFilter();
+       await startAuthSessionObserver();
 
-        loadAdminCategories();
+loadCategoryFilter();
+loadAdminCategories();
 
-        updateNavigation();
-
+updateNavigation();
         updateCartCount();
 
         displayBooks();
