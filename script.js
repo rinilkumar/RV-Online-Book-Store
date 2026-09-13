@@ -326,9 +326,6 @@ function startManagerProfileSync() {
                         "currentManager"
                     );
 
-                    localStorage.removeItem(
-                        "managerLoggedIn"
-                    );
 
 
                     try {
@@ -369,10 +366,6 @@ localStorage.setItem(
     JSON.stringify(manager)
 );
 
-localStorage.setItem(
-    "managerLoggedIn",
-    "true"
-);
 
 
                 console.log(
@@ -671,9 +664,6 @@ async function registerManager(event) {
             "currentManager"
         );
 
-        localStorage.removeItem(
-            "managerLoggedIn"
-        );
 
         localStorage.removeItem(
             "currentCustomer"
@@ -2142,10 +2132,6 @@ async function adminLogin(event) {
 
         localStorage.removeItem(
             "currentManager"
-        );
-
-        localStorage.removeItem(
-            "managerLoggedIn"
         );
 
 
@@ -7314,9 +7300,7 @@ async function loadManagerDashboard() {
                 "currentManager"
             );
 
-            localStorage.removeItem(
-                "managerLoggedIn"
-            );
+           
 
             await auth.signOut();
 
@@ -7354,9 +7338,7 @@ async function loadManagerDashboard() {
                 "currentManager"
             );
 
-            localStorage.removeItem(
-                "managerLoggedIn"
-            );
+           
 
             await auth.signOut();
 
@@ -11925,9 +11907,7 @@ async function changeManagerStatus(
                     "currentManager"
                 );
 
-                localStorage.removeItem(
-                    "managerLoggedIn"
-                );
+                
 
             }
             else {
@@ -12101,9 +12081,7 @@ async function removeManager(managerId) {
                 "currentManager"
             );
 
-            localStorage.removeItem(
-                "managerLoggedIn"
-            );
+          
         }
 
 
