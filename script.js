@@ -61,15 +61,7 @@ function getCategories() {
 
 }
 
-    /* SUBCATEGORIES */
-
-if (!localStorage.getItem("subcategories")) {
-
-    localStorage.setItem(
-        "subcategories",
-        JSON.stringify({})
-    );
-}
+ 
 
 }
    
@@ -84,7 +76,6 @@ function getCart() {
     ) || [];
 }
 
-
 function getCategories() {
 
     return JSON.parse(
@@ -93,14 +84,19 @@ function getCategories() {
 }
 
 /* =====================================================
-   SUBCATEGORY STORAGE HELPER
+   SUBCATEGORY RUNTIME CACHE
 ===================================================== */
+
+let subcategoriesCache = {};
+
 
 function getSubcategories() {
 
     return JSON.parse(
-        localStorage.getItem("subcategories")
-    ) || {};
+        JSON.stringify(
+            subcategoriesCache
+        )
+    );
 }
 
 function getCurrentCustomer() {
@@ -2859,9 +2855,11 @@ try {
             items: allSubcategories
         });
 
-    localStorage.setItem(
-        "subcategories",
-        JSON.stringify(allSubcategories)
+   subcategoriesCache =
+    JSON.parse(
+        JSON.stringify(
+            allSubcategories
+        )
     );
 
     console.log(
@@ -3123,9 +3121,11 @@ try {
             items: allSubcategories
         });
 
-    localStorage.setItem(
-        "subcategories",
-        JSON.stringify(allSubcategories)
+   subcategoriesCache =
+    JSON.parse(
+        JSON.stringify(
+            allSubcategories
+        )
     );
 
     console.log(
@@ -3290,9 +3290,11 @@ try {
             items: allSubcategories
         });
 
-    localStorage.setItem(
-        "subcategories",
-        JSON.stringify(allSubcategories)
+   subcategoriesCache =
+    JSON.parse(
+        JSON.stringify(
+            allSubcategories
+        )
     );
 
     console.log(
@@ -14358,10 +14360,12 @@ async function loadSubcategoriesFromFirestore() {
             const subcategories =
                 data.items || {};
 
-            localStorage.setItem(
-                "subcategories",
-                JSON.stringify(subcategories)
-            );
+          subcategoriesCache =
+    JSON.parse(
+        JSON.stringify(
+            subcategories
+        )
+    );
 
             console.log(
                 "Subcategories loaded from Firestore:",
