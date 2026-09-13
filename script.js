@@ -48,27 +48,18 @@ function initializeStorage() {
         );
     }
 
+/* =====================================================
+   CATEGORY RUNTIME CACHE
+===================================================== */
 
-    /* BOOKS */
-
-    if (!localStorage.getItem("books")) {
-
-        localStorage.setItem(
-            "books",
-            JSON.stringify([])
-        );
-    }
+let categoriesCache = [];
 
 
-    /* CATEGORIES */
+function getCategories() {
 
-    if (!localStorage.getItem("categories")) {
+    return categoriesCache.slice();
 
-        localStorage.setItem(
-            "categories",
-            JSON.stringify([])
-        );
-    }
+}
 
     /* SUBCATEGORIES */
 
@@ -86,12 +77,6 @@ if (!localStorage.getItem("subcategories")) {
 /* =====================================================
    STORAGE HELPERS
 ===================================================== */
-
-function getBooks() {
-    return JSON.parse(
-        localStorage.getItem("books")
-    ) || [];
-}
 
 function getCart() {
     return JSON.parse(
@@ -3834,10 +3819,8 @@ async function editCategory(index) {
             items: categories
         });
 
-    localStorage.setItem(
-        "categories",
-        JSON.stringify(categories)
-    );
+    categoriesCache =
+    categories.slice();
 
     console.log(
         "Category updated in Firestore:",
@@ -3940,31 +3923,70 @@ async function deleteCategory(index) {
     const category =
         categories[index];
 
+/* =========================================
+   CHECK CATEGORY USE IN FIRESTORE
+========================================= */
 
-    const books =
-        getBooks();
-
-
-    const used =
-        books.some(
-            function (book) {
-
-                return (
-                    book.category ===
-                    category
-                );
-            }
-        );
+let categoryUsed =
+    false;
 
 
-    if (used) {
+try {
 
-        alert(
-            "This category is currently used by a book. Change the book category first."
-        );
+    const snapshot =
+        await db.collection("books")
+            .where(
+                "category",
+                "==",
+                category
+            )
+            .limit(1)
+            .get();
 
-        return;
-    }
+
+    categoryUsed =
+        !snapshot.empty;
+
+
+    console.log(
+        "Category usage checked in Firestore:",
+        {
+            category:
+                category,
+
+            used:
+                categoryUsed
+        }
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error checking category usage:",
+        error
+    );
+
+
+    alert(
+        "Category usage could not be checked.\n\n" +
+        "Please try again."
+    );
+
+
+    return;
+}
+
+
+if (categoryUsed) {
+
+    alert(
+        "This category is currently used by a book. " +
+        "Change the book category first."
+    );
+
+    return;
+}
 
 
     if (
@@ -3996,10 +4018,8 @@ try {
             items: categories
         });
 
-    localStorage.setItem(
-        "categories",
-        JSON.stringify(categories)
-    );
+   categoriesCache =
+    categories.slice();
 
     console.log(
         "Category deleted from Firestore:",
@@ -4125,14 +4145,7 @@ try {
     });
 
 
-    /* =========================================
-       KEEP LOCAL COPY FOR CART + OLD FUNCTIONS
-    ========================================= */
-
-    localStorage.setItem(
-        "books",
-        JSON.stringify(books)
-    );
+   
 
 
     console.log(
@@ -4149,13 +4162,23 @@ catch (error) {
     );
 
 
-    /*
-       If internet/Firestore has a temporary
-       problem, use the old local copy.
-    */
+    container.innerHTML = `
+        <div class="empty-message">
 
-    books = getBooks();
+            <h3>
+                Books could not be loaded.
+            </h3>
 
+            <p>
+                Please check your connection
+                and try again.
+            </p>
+
+        </div>
+    `;
+
+
+    return;
 }
 
 
@@ -7374,10 +7397,13 @@ async function loadManagerDashboard() {
 
         const books = [];
 
-        const customers = [];
 
-        const orders = [];
+const totalCustomers =
+    customersSnapshot.size;
 
+
+const totalOrders =
+    ordersSnapshot.size;
 
         /* =========================================
            BUILD BOOK ARRAY
@@ -7403,89 +7429,7 @@ async function loadManagerDashboard() {
         );
 
 
-        /* =========================================
-           BUILD CUSTOMER ARRAY
-        ========================================= */
-
-        customersSnapshot.forEach(
-            function (doc) {
-
-                const data =
-                    doc.data();
-
-                customers.push({
-
-                    ...data,
-
-                    id:
-                        data.id !== undefined
-                            ? data.id
-                            : doc.id
-
-                });
-            }
-        );
-
-
-        /* =========================================
-           BUILD ORDER ARRAY
-        ========================================= */
-
-        ordersSnapshot.forEach(
-            function (doc) {
-
-                const data =
-                    doc.data();
-
-                orders.push({
-
-                    ...data,
-
-                    id:
-                        data.id !== undefined
-                            ? data.id
-                            : doc.id
-
-                });
-            }
-        );
-
-
-        /* =========================================
-           UPDATE LOCAL CACHE
-           Existing Manager sections still use it.
-        ========================================= */
-
-        localStorage.setItem(
-            "books",
-            JSON.stringify(books)
-        );
-
-        localStorage.setItem(
-            "customers",
-            JSON.stringify(customers)
-        );
-
-        localStorage.setItem(
-            "orders",
-            JSON.stringify(orders)
-        );
-
-
-        console.log(
-            "Manager Dashboard loaded from Firestore:",
-            {
-                books:
-                    books.length,
-
-                customers:
-                    customers.length,
-
-                orders:
-                    orders.length
-            }
-        );
-
+       
 
         /* =========================================
            CALCULATE TOTAL STOCK
@@ -7528,15 +7472,14 @@ async function loadManagerDashboard() {
 
 
         setText(
-            "managerTotalCustomers",
-            customers.length
-        );
+    "managerTotalCustomers",
+    totalCustomers
+);
 
-
-        setText(
-            "managerTotalOrders",
-            orders.length
-        );
+setText(
+    "managerTotalOrders",
+    totalOrders
+);
 
 
         /* =========================================
@@ -7564,14 +7507,18 @@ async function loadManagerDashboard() {
            LOAD MANAGER STOCK
         ========================================= */
 
-        displayManagerStock();
+        await displayManagerStock(
+    books
+);
 
 
         /* =========================================
            LOAD CUSTOMER ACTIVITY
         ========================================= */
 
-        displayManagerCustomerActivity();
+        await displayManagerCustomerActivity(
+    ordersSnapshot
+);
 
 
         /* =========================================
@@ -9067,7 +9014,9 @@ async function managerRejectPayment(orderId) {
    DISPLAY MANAGER STOCK - FIRESTORE
 ===================================================== */
 
-async function displayManagerStock() {
+async function displayManagerStock(
+    preloadedBooks = null
+) {
 
     const container =
         document.getElementById(
@@ -9086,13 +9035,33 @@ async function displayManagerStock() {
 
 
     /* =========================================
-       LOAD LATEST BOOKS FROM FIRESTORE
-    ========================================= */
+   USE PRELOADED BOOKS WHEN AVAILABLE
+========================================= */
 
-    let books = [];
+let books = [];
 
 
-    try {
+try {
+
+    /*
+       When Manager Dashboard already loaded
+       the books, reuse that array.
+    */
+
+    if (
+        Array.isArray(preloadedBooks)
+    ) {
+
+        books =
+            preloadedBooks;
+
+    }
+    else {
+
+        /*
+           If displayManagerStock() is called
+           separately, load fresh books.
+        */
 
         const snapshot =
             await db.collection("books")
@@ -9120,19 +9089,41 @@ async function displayManagerStock() {
             }
         );
 
-
-        console.log(
-            "Manager stock loaded from Firestore:",
-            books.length
-        );
-
     }
-    catch (error) {
 
-        console.error(
-            "Error loading Manager stock:",
-            error
-        );
+
+    console.log(
+        "Manager stock prepared:",
+        books.length
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "Error loading Manager stock:",
+        error
+    );
+
+
+    container.innerHTML = `
+        <div class="empty-message">
+
+            <h3>
+                Stock details could not be loaded.
+            </h3>
+
+            <p>
+                Please check your connection
+                and try again.
+            </p>
+
+        </div>
+    `;
+
+
+    return;
+}
 
 
         container.innerHTML = `
@@ -9507,7 +9498,9 @@ async function updateManagerStock(bookId) {
    DISPLAY CUSTOMER ACTIVITY - MANAGER
 ===================================================== */
 
-async function displayManagerCustomerActivity() {
+async function displayManagerCustomerActivity(
+    preloadedOrdersSnapshot = null
+) {
 
     const container =
         document.getElementById(
@@ -9529,94 +9522,109 @@ async function displayManagerCustomerActivity() {
     }
 
 
-   /* =========================================
-   LOAD LATEST ORDERS FROM FIRESTORE
-========================================= */
-
-let orders = [];
-
-try {
-
-    const snapshot =
-        await db.collection("orders")
-            .get();
-
-
-    snapshot.forEach(
-        function (doc) {
-
-            const data =
-                doc.data();
-
-
-            orders.push({
-
-                ...data,
-
-                id:
-                    data.id ||
-                    doc.id
-
-            });
-
-        }
-    );
-
-
     /* =========================================
-       NEWEST ORDERS FIRST
+       USE PRELOADED ORDERS WHEN AVAILABLE
     ========================================= */
 
-    orders.sort(
-        function (a, b) {
+    let orders = [];
 
-            return String(
-                b.id || ""
-            ).localeCompare(
-                String(
-                    a.id || ""
-                )
-            );
 
+    try {
+
+        let snapshot =
+            preloadedOrdersSnapshot;
+
+
+        /*
+           If this function is called somewhere
+           without a snapshot, load Firestore here.
+        */
+
+        if (!snapshot) {
+
+            snapshot =
+                await db.collection("orders")
+                    .get();
         }
-    );
 
 
-    console.log(
-        "Manager customer activity loaded from Firestore:",
-        orders.length
-    );
+        snapshot.forEach(
+            function (doc) {
 
-}
-catch (error) {
-
-    console.error(
-        "Error loading Manager customer activity:",
-        error
-    );
+                const data =
+                    doc.data();
 
 
-    container.innerHTML = `
-        <div class="empty-message">
+                orders.push({
 
-            <h3>
-                Customer activity could not be loaded.
-            </h3>
+                    ...data,
 
-            <p>
-                Please check your connection and try again.
-            </p>
+                    id:
+                        data.id !== undefined
+                            ? data.id
+                            : doc.id
 
-        </div>
-    `;
+                });
 
-    return;
-}
+            }
+        );
+
+
+        /* =========================================
+           NEWEST ORDERS FIRST
+        ========================================= */
+
+        orders.sort(
+            function (a, b) {
+
+                return String(
+                    b.id || ""
+                ).localeCompare(
+                    String(
+                        a.id || ""
+                    )
+                );
+
+            }
+        );
+
+
+        console.log(
+            "Manager customer activity prepared:",
+            orders.length
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error loading Manager customer activity:",
+            error
+        );
+
+
+        container.innerHTML = `
+            <div class="empty-message">
+
+                <h3>
+                    Customer activity could not be loaded.
+                </h3>
+
+                <p>
+                    Please check your connection
+                    and try again.
+                </p>
+
+            </div>
+        `;
+
+
+        return;
+    }
 
 
     // Clear old activity
     container.innerHTML = "";
-
 
     /* =========================================
        NO CUSTOMER ACTIVITY
@@ -10059,23 +10067,19 @@ let editingBookData = null;
 
 function openEditBookSubcategoryModal(
     bookId,
-    updatedBook
+    updatedBook,
+    originalBook
 ) {
 
-    const books = getBooks();
+    const book =
+        originalBook;
 
-   const book =
-    books.find(function (item) {
-
-        return (
-            String(item.id) ===
-            String(bookId)
-        );
-    });
 
     if (!book) {
 
-        alert("Book not found.");
+        alert(
+            "Book data was not found."
+        );
 
         return;
     }
@@ -10356,35 +10360,7 @@ try {
    UPDATE LOCAL BOOK CACHE
 ========================================= */
 
-let books =
-    getBooks();
 
-
-const index =
-    books.findIndex(
-        function (book) {
-
-            return (
-                String(book.id) ===
-                String(editingBookId)
-            );
-        }
-    );
-
-
-if (index >= 0) {
-
-    books[index] = {
-        ...books[index],
-        ...editingBookData
-    };
-
-
-    localStorage.setItem(
-        "books",
-        JSON.stringify(books)
-    );
-}
 
     console.log(
         "Book updated in Firestore:",
@@ -10427,33 +10403,66 @@ catch (error) {
 }
 
 /* =====================================================
-   EDIT BOOK
+   EDIT BOOK - FIRESTORE
 ===================================================== */
 
-function editBook(bookId) {
+async function editBook(bookId) {
 
-    let books =
-        getBooks();
-
-    const index =
-        books.findIndex(function (book) {
-
-            return String(book.id) ===
-                   String(bookId);
-
-        });
+    let book;
 
 
-    if (index === -1) {
+    /* =========================================
+       LOAD LATEST BOOK FROM FIRESTORE
+    ========================================= */
 
-        alert("Book not found.");
+    try {
+
+        const bookDoc =
+            await db.collection("books")
+                .doc(String(bookId))
+                .get();
+
+
+        if (!bookDoc.exists) {
+
+            alert(
+                "Book not found in Firestore."
+            );
+
+            return;
+        }
+
+
+        const data =
+            bookDoc.data();
+
+
+        book = {
+
+            ...data,
+
+            id:
+                data.id !== undefined
+                    ? data.id
+                    : bookDoc.id
+
+        };
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error loading book for editing:",
+            error
+        );
+
+
+        alert(
+            "Book could not be loaded for editing."
+        );
 
         return;
     }
-
-
-    const book =
-        books[index];
 
 
     /* ===============================
@@ -10465,6 +10474,7 @@ function editBook(bookId) {
             "Edit Book Title:",
             book.title
         );
+
 
     if (newTitle === null) {
         return;
@@ -10481,6 +10491,7 @@ function editBook(bookId) {
             book.author
         );
 
+
     if (newAuthor === null) {
         return;
     }
@@ -10496,7 +10507,25 @@ function editBook(bookId) {
             book.price
         );
 
+
     if (newPrice === null) {
+        return;
+    }
+
+
+    const price =
+        Number(newPrice);
+
+
+    if (
+        !Number.isFinite(price) ||
+        price < 0
+    ) {
+
+        alert(
+            "Please enter a valid price."
+        );
+
         return;
     }
 
@@ -10511,7 +10540,25 @@ function editBook(bookId) {
             book.stock
         );
 
+
     if (newStock === null) {
+        return;
+    }
+
+
+    const stock =
+        Number(newStock);
+
+
+    if (
+        !Number.isInteger(stock) ||
+        stock < 0
+    ) {
+
+        alert(
+            "Please enter a valid stock quantity."
+        );
+
         return;
     }
 
@@ -10522,6 +10569,7 @@ function editBook(bookId) {
 
     const categories =
         getCategories();
+
 
     const categoryMessage =
         "Available Categories:\n\n" +
@@ -10545,7 +10593,11 @@ function editBook(bookId) {
         newCategory.trim();
 
 
-    if (!categories.includes(cleanedCategory)) {
+    if (
+        !categories.includes(
+            cleanedCategory
+        )
+    ) {
 
         alert(
             "Please enter an existing category."
@@ -10553,7 +10605,6 @@ function editBook(bookId) {
 
         return;
     }
-
 
 
     /* ===============================
@@ -10566,48 +10617,50 @@ function editBook(bookId) {
             book.image || ""
         );
 
+
     if (newImage === null) {
         return;
     }
 
 
     /* ===============================
-       UPDATE BOOK
+       PREPARE UPDATED BOOK
     =============================== */
 
-   const updatedBook = {
+    const updatedBook = {
 
-    ...book,
+        ...book,
 
-    title:
-        newTitle.trim(),
+        title:
+            newTitle.trim(),
 
-    author:
-        newAuthor.trim(),
+        author:
+            newAuthor.trim(),
 
-    price:
-        Number(newPrice),
+        price:
+            price,
 
-    category:
-        cleanedCategory,
+        category:
+            cleanedCategory,
 
-    stock:
-        Number(newStock),
+        stock:
+            stock,
 
-    image:
-        newImage.trim()
+        image:
+            newImage.trim()
 
-};
+    };
 
 
-  /* =====================================================
-   OPEN SUBCATEGORY CHECKBOX WINDOW
-===================================================== */
+    /* =========================================
+       OPEN SUBCATEGORY CHECKBOX WINDOW
+    ========================================= */
 
-openEditBookSubcategoryModal(
-    bookId,
-    updatedBook
-);
+    openEditBookSubcategoryModal(
+        bookId,
+        updatedBook,
+        book
+    );
 }
 
 /* =====================================================
@@ -10785,14 +10838,6 @@ try {
     );
 
 
-    /* KEEP LOCAL CACHE UPDATED */
-
-    localStorage.setItem(
-        "managers",
-        JSON.stringify(
-            managers
-        )
-    );
 
 
     console.log(
@@ -12381,27 +12426,71 @@ async function displayBookDetails() {
     }
 
 
-    const books =
-        getBooks();
-
    /* =========================================
-   LOAD ORDERS FROM FIRESTORE
+   LOAD BOOKS + ORDERS FROM FIRESTORE
 ========================================= */
 
+let books = [];
 let orders = [];
+
 
 try {
 
-    const snapshot =
-        await db.collection("orders")
-            .get();
+    const results =
+        await Promise.all([
+
+            db.collection("books")
+                .get(),
+
+            db.collection("orders")
+                .get()
+
+        ]);
 
 
-    snapshot.forEach(
+    const booksSnapshot =
+        results[0];
+
+    const ordersSnapshot =
+        results[1];
+
+
+    /* =========================================
+       BUILD BOOK ARRAY
+    ========================================= */
+
+    booksSnapshot.forEach(
         function (doc) {
 
             const data =
                 doc.data();
+
+
+            books.push({
+
+                ...data,
+
+                id:
+                    data.id !== undefined
+                        ? data.id
+                        : doc.id
+
+            });
+
+        }
+    );
+
+
+    /* =========================================
+       BUILD ORDER ARRAY
+    ========================================= */
+
+    ordersSnapshot.forEach(
+        function (doc) {
+
+            const data =
+                doc.data();
+
 
             orders.push({
 
@@ -12411,26 +12500,64 @@ try {
                     data.id !== undefined
                         ? data.id
                         : doc.id
+
             });
 
         }
     );
 
 
-
     console.log(
-        "Book purchase data loaded from Firestore:",
-        orders
+        "Book details loaded from Firestore:",
+        {
+            books:
+                books.length,
+
+            orders:
+                orders.length
+        }
     );
 
 }
 catch (error) {
 
     console.error(
-        "Error loading book purchase data:",
+        "Error loading book details:",
         error
     );
 
+
+    container.innerHTML = `
+        <div class="empty-message">
+
+            <h3>
+                Book details could not be loaded.
+            </h3>
+
+            <p>
+                Please check your connection
+                and try again.
+            </p>
+
+        </div>
+    `;
+
+
+    if (bottomContainer) {
+
+        bottomContainer.innerHTML = `
+            <div class="empty-message">
+
+                Order details could not be loaded.
+
+            </div>
+        `;
+
+    }
+
+
+    return;
+}
 
     container.innerHTML = `
         <div class="empty-message">
@@ -12818,12 +12945,7 @@ try {
     );
 
 
-    /* Keep local cache for old functions */
-
-    localStorage.setItem(
-        "orders",
-        JSON.stringify(orders)
-    );
+   
 
 
     console.log(
@@ -13237,79 +13359,7 @@ ${
         );
 }
 
-function validateOrderStock(
-    orderBooks
-) {
 
-    const books =
-        getBooks();
-
-
-    if (!Array.isArray(orderBooks)) {
-
-        return false;
-    }
-
-
-    for (const orderBook of orderBooks) {
-
-        const book =
-            books.find(
-                function (item) {
-
-                    return (
-                        String(item.id) ===
-                        String(orderBook.id)
-                    );
-
-                }
-            );
-
-
-        if (!book) {
-
-            alert(
-                orderBook.title +
-                " is no longer available."
-            );
-
-            return false;
-        }
-
-
-        const requiredQuantity =
-            Number(
-                orderBook.quantity
-            ) || 1;
-
-
-        const availableStock =
-            Number(book.stock) || 0;
-
-
-        if (
-            requiredQuantity >
-            availableStock
-        ) {
-
-            alert(
-                "Not enough stock for " +
-                orderBook.title +
-                ".\n\n" +
-                "Required: " +
-                requiredQuantity +
-                "\n" +
-                "Available: " +
-                availableStock
-            );
-
-            return false;
-        }
-    }
-
-
-    return true;
-}
 
 
 
@@ -14355,10 +14405,8 @@ async function loadCategoriesFromFirestore() {
                     ? data.items
                     : [];
 
-            localStorage.setItem(
-                "categories",
-                JSON.stringify(categories)
-            );
+          categoriesCache =
+    categories.slice();
 
             console.log(
                 "Categories loaded from Firestore:",
