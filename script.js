@@ -80,7 +80,7 @@ if (!localStorage.getItem("subcategories")) {
     );
 }
 
-
+}
    
 
 /* =====================================================
@@ -361,57 +361,19 @@ function startManagerProfileSync() {
 
 
 
-                localStorage.setItem(
-                    "managerLoggedIn",
-                    "true"
-                );
+          /* =================================
+   UPDATE CURRENT MANAGER SESSION
+================================= */
 
+localStorage.setItem(
+    "currentManager",
+    JSON.stringify(manager)
+);
 
-                /* =================================
-                   UPDATE MANAGER LIST CACHE
-                ================================= */
-
-                let managers =
-                    getManagers();
-
-
-                const managerIndex =
-                    managers.findIndex(
-                        function (item) {
-
-                            return (
-                                String(
-                                    item.managerId
-                                ) ===
-                                String(
-                                    manager.managerId
-                                )
-                            );
-                        }
-                    );
-
-
-                if (managerIndex >= 0) {
-
-                    managers[
-                        managerIndex
-                    ] = manager;
-
-                }
-                else {
-
-                    managers.push(
-                        manager
-                    );
-                }
-
-
-                localStorage.setItem(
-                    "managers",
-                    JSON.stringify(
-                        managers
-                    )
-                );
+localStorage.setItem(
+    "managerLoggedIn",
+    "true"
+);
 
 
                 console.log(
@@ -4420,125 +4382,229 @@ function changeBookQuantity(
 
 
 /* =====================================================
-   ADD BOOK TO CART
+   ADD BOOK TO CART - FIRESTORE
 ===================================================== */
 
-function addSelectedBookToCart(bookId) {
+async function addSelectedBookToCart(bookId) {
 
-    const books =
-        getBooks();
+    try {
 
+        /* =========================================
+           GET LATEST BOOK FROM FIRESTORE
+        ========================================= */
 
-    const book =
-        books.find(
-            function (item) {
-
-                return (
-                    String(item.id) ===
-                    String(bookId)
-                );
-            }
-        );
+        const bookDoc =
+            await db.collection("books")
+                .doc(String(bookId))
+                .get();
 
 
-    if (!book) {
-
-        alert(
-            "Book not found."
-        );
-
-        return;
-    }
-
-
-    const input =
-        document.getElementById(
-            "bookQty-" + bookId
-        );
-
-
-    const quantity =
-        input
-            ? Number(input.value)
-            : 1;
-
-
-    const stock =
-        Number(book.stock) || 0;
-
-
-    if (quantity > stock) {
-
-        alert(
-            "Only " +
-            stock +
-            " books available."
-        );
-
-        return;
-    }
-
-
-    let cart =
-        getCart();
-
-
-    const existing =
-        cart.find(
-            function (item) {
-
-                return (
-                    String(item.id) ===
-                    String(bookId)
-                );
-            }
-        );
-
-
-    if (existing) {
-
-        const newQuantity =
-            Number(existing.quantity) +
-            quantity;
-
-
-        if (newQuantity > stock) {
+        if (!bookDoc.exists) {
 
             alert(
-                "You cannot add more than available stock."
+                "Book not found."
             );
 
             return;
         }
 
 
-        existing.quantity =
-            newQuantity;
+        const data =
+            bookDoc.data();
 
-    } else {
 
-        cart.push({
+        const book = {
 
-            ...book,
+            ...data,
 
-            quantity: quantity
-        });
+            id:
+                data.id !== undefined
+                    ? data.id
+                    : bookDoc.id
+
+        };
+
+
+        /* =========================================
+           GET SELECTED QUANTITY
+        ========================================= */
+
+        const input =
+            document.getElementById(
+                "bookQty-" + bookId
+            );
+
+
+        const quantity =
+            input
+                ? Number(input.value)
+                : 1;
+
+
+        if (
+            !Number.isInteger(quantity) ||
+            quantity < 1
+        ) {
+
+            alert(
+                "Please select a valid quantity."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           CHECK LATEST FIRESTORE STOCK
+        ========================================= */
+
+        const stock =
+            Number(book.stock) || 0;
+
+
+        if (stock <= 0) {
+
+            alert(
+                "This book is out of stock."
+            );
+
+            return;
+        }
+
+
+        if (quantity > stock) {
+
+            alert(
+                "Only " +
+                stock +
+                " books available."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           LOAD CART
+        ========================================= */
+
+        let cart =
+            getCart();
+
+
+        const existing =
+            cart.find(
+                function (item) {
+
+                    return (
+                        String(item.id) ===
+                        String(bookId)
+                    );
+
+                }
+            );
+
+
+        /* =========================================
+           UPDATE CART QUANTITY
+        ========================================= */
+
+        if (existing) {
+
+            const newQuantity =
+                Number(
+                    existing.quantity
+                ) +
+                quantity;
+
+
+            if (newQuantity > stock) {
+
+                alert(
+                    "You cannot add more than available stock."
+                );
+
+                return;
+            }
+
+
+            existing.quantity =
+                newQuantity;
+
+            /*
+               Refresh book information using
+               latest Firestore values.
+            */
+
+            existing.title =
+                book.title;
+
+            existing.author =
+                book.author;
+
+            existing.price =
+                book.price;
+
+            existing.stock =
+                book.stock;
+
+            existing.image =
+                book.image;
+
+            existing.category =
+                book.category;
+
+            existing.subcategories =
+                book.subcategories || [];
+
+        }
+        else {
+
+            cart.push({
+
+                ...book,
+
+                quantity:
+                    quantity
+
+            });
+
+        }
+
+
+        /* =========================================
+           SAVE CART
+        ========================================= */
+
+        localStorage.setItem(
+            "cart",
+            JSON.stringify(cart)
+        );
+
+
+        updateCartCount();
+
+
+        alert(
+            book.title +
+            " added to cart."
+        );
+
     }
+    catch (error) {
+
+        console.error(
+            "Add to cart Firestore error:",
+            error
+        );
 
 
-    localStorage.setItem(
-        "cart",
-        JSON.stringify(cart)
-    );
+        alert(
+            "Book could not be added to cart.\n\n" +
+            "Please check your connection and try again."
+        );
 
-
-    updateCartCount();
-
-
-    alert(
-        book.title +
-        " added to cart."
-    );
+    }
 }
 
 
@@ -8998,10 +9064,10 @@ async function managerRejectPayment(orderId) {
 
 
 /* =====================================================
-   DISPLAY MANAGER STOCK
+   DISPLAY MANAGER STOCK - FIRESTORE
 ===================================================== */
 
-function displayManagerStock() {
+async function displayManagerStock() {
 
     const container =
         document.getElementById(
@@ -9019,8 +9085,74 @@ function displayManagerStock() {
     }
 
 
-    const books =
-        getBooks();
+    /* =========================================
+       LOAD LATEST BOOKS FROM FIRESTORE
+    ========================================= */
+
+    let books = [];
+
+
+    try {
+
+        const snapshot =
+            await db.collection("books")
+                .get();
+
+
+        snapshot.forEach(
+            function (doc) {
+
+                const data =
+                    doc.data();
+
+
+                books.push({
+
+                    ...data,
+
+                    id:
+                        data.id !== undefined
+                            ? data.id
+                            : doc.id
+
+                });
+
+            }
+        );
+
+
+        console.log(
+            "Manager stock loaded from Firestore:",
+            books.length
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error loading Manager stock:",
+            error
+        );
+
+
+        container.innerHTML = `
+            <div class="empty-message">
+
+                <h3>
+                    Stock details could not be loaded.
+                </h3>
+
+                <p>
+                    Please check your connection
+                    and try again.
+                </p>
+
+            </div>
+        `;
+
+
+        return;
+    }
 
 
     container.innerHTML = "";
@@ -9051,70 +9183,74 @@ function displayManagerStock() {
        DISPLAY EVERY BOOK
     ========================================= */
 
-    books.forEach(function (book) {
+    books.forEach(
+        function (book) {
 
-        const card =
-            document.createElement("div");
-
-
-        card.className =
-            "manager-stock-card";
-
-
-        card.innerHTML = `
-
-            <div class="manager-stock-info">
-
-                <h3>
-                    📚 ${book.title}
-                </h3>
-
-                <p>
-                    Author:
-                    ${book.author}
-                </p>
-
-                <p>
-                    Category:
-                    ${book.category}
-                </p>
-
-                <p>
-                    Current Stock:
-
-                    <strong>
-                        ${book.stock}
-                    </strong>
-                </p>
-
-            </div>
+            const card =
+                document.createElement(
+                    "div"
+                );
 
 
-            <div class="manager-stock-control">
-
-                <input
-                    type="number"
-                    id="managerStock-${book.id}"
-                    value="${book.stock}"
-                    min="0"
-                >
+            card.className =
+                "manager-stock-card";
 
 
-                <button
-                    type="button"
-                    onclick="updateManagerStock('${book.id}')"
-                >
-                    Update Stock
-                </button>
+            card.innerHTML = `
 
-            </div>
+                <div class="manager-stock-info">
 
-        `;
+                    <h3>
+                        📚 ${book.title}
+                    </h3>
+
+                    <p>
+                        Author:
+                        ${book.author}
+                    </p>
+
+                    <p>
+                        Category:
+                        ${book.category}
+                    </p>
+
+                    <p>
+                        Current Stock:
+
+                        <strong>
+                            ${book.stock}
+                        </strong>
+                    </p>
+
+                </div>
 
 
-        container.appendChild(card);
+                <div class="manager-stock-control">
 
-    });
+                    <input
+                        type="number"
+                        id="managerStock-${book.id}"
+                        value="${book.stock}"
+                        min="0"
+                    >
+
+                    <button
+                        type="button"
+                        onclick="updateManagerStock('${book.id}')"
+                    >
+                        Update Stock
+                    </button>
+
+                </div>
+            `;
+
+
+            container.appendChild(
+                card
+            );
+
+        }
+    );
 }
 
 /* =====================================================
@@ -9304,46 +9440,14 @@ async function updateManagerStock(bookId) {
         );
 
 
-        /* =========================================
-           UPDATE LOCAL BOOK CACHE
-        ========================================= */
-
-        let books =
-            getBooks();
-
-
-        const index =
-            books.findIndex(
-                function (item) {
-
-                    return (
-                        String(item.id) ===
-                        String(bookId)
-                    );
-                }
-            );
-
-
-        if (index >= 0) {
-
-            books[index].stock =
-                newStock;
-
-
-            localStorage.setItem(
-                "books",
-                JSON.stringify(
-                    books
-                )
-            );
-        }
+      
 
 
         /* =========================================
            REFRESH WEBSITE
         ========================================= */
 
-        displayManagerStock();
+         await displayManagerStock();
 
         displayBooks();
 
@@ -14376,8 +14480,6 @@ document.addEventListener(
     async function () {
 
         initializeStorage();
-
-        initializeManagerPermissions();
 
        await loadCategoriesFromFirestore();
 
