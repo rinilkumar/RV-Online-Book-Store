@@ -918,6 +918,10 @@ async function managerLogin(event) {
         localStorage.removeItem(
             "currentCustomer"
         );
+       
+       localStorage.removeItem(
+    "currentAdmin"
+);
 
 
         event.target.reset();
@@ -1638,9 +1642,15 @@ async function customerLogin(event) {
         }
 
 
-        const customer =
-            customerDoc.data();
+        const customer = {
 
+    ...customerDoc.data(),
+
+    id:
+        customerDoc.data().id ||
+        user.uid
+
+};
  
 
 
@@ -1650,6 +1660,34 @@ async function customerLogin(event) {
             "currentCustomer",
             JSON.stringify(customer)
         );
+
+
+       /* =========================================
+   CLEAR OTHER ACCOUNT TYPES
+========================================= */
+
+localStorage.removeItem(
+    "currentManager"
+);
+
+localStorage.removeItem(
+    "currentAdmin"
+);
+
+
+/* Stop old Manager listener if active */
+
+if (
+    typeof managerProfileUnsubscribe !==
+        "undefined" &&
+    managerProfileUnsubscribe
+) {
+
+    managerProfileUnsubscribe();
+
+    managerProfileUnsubscribe =
+        null;
+}
 
 
         console.log(
@@ -2036,10 +2074,7 @@ async function adminLogin(event) {
 
             await auth.signOut();
 
-            localStorage.removeItem(
-                "adminLoggedIn"
-            );
-
+           
             localStorage.removeItem(
                 "currentAdmin"
             );
@@ -2068,9 +2103,7 @@ async function adminLogin(event) {
 
             await auth.signOut();
 
-            localStorage.removeItem(
-                "adminLoggedIn"
-            );
+           
 
             localStorage.removeItem(
                 "currentAdmin"
@@ -2116,10 +2149,7 @@ async function adminLogin(event) {
         );
 
 
-        localStorage.setItem(
-            "adminLoggedIn",
-            "true"
-        );
+       
 
 
         /* =========================================
@@ -2187,9 +2217,7 @@ async function adminLogin(event) {
     );
 
 
-    localStorage.removeItem(
-        "adminLoggedIn"
-    );
+   
 
     localStorage.removeItem(
         "currentAdmin"
@@ -2302,7 +2330,6 @@ function getCurrentAdmin() {
     }
 }
 
-
 /* =====================================================
    ADMIN LOGIN CHECK
 ===================================================== */
@@ -2312,7 +2339,6 @@ function isAdminLoggedIn() {
     const currentAdmin =
         getCurrentAdmin();
 
-
     const user =
         auth.currentUser;
 
@@ -2321,33 +2347,22 @@ function isAdminLoggedIn() {
         !user ||
         !currentAdmin
     ) {
-
         return false;
     }
 
 
     return (
-
-        localStorage.getItem(
-            "adminLoggedIn"
-        ) === "true"
-
-        &&
-
-        currentAdmin.uid ===
-            user.uid
-
-        &&
+        String(currentAdmin.uid || "") ===
+            String(user.uid) &&
 
         currentAdmin.role ===
-            "admin"
-
-        &&
+            "admin" &&
 
         currentAdmin.active ===
             true
     );
 }
+
 
 /* =====================================================
    RESTORE ADMIN FIREBASE SESSION
@@ -2358,15 +2373,15 @@ function restoreAdminSession() {
     auth.onAuthStateChanged(
         async function (user) {
 
+            const savedAdmin =
+                getCurrentAdmin();
+
+
             /* =========================================
                NO FIREBASE USER
             ========================================= */
 
             if (!user) {
-
-                localStorage.removeItem(
-                    "adminLoggedIn"
-                );
 
                 localStorage.removeItem(
                     "currentAdmin"
@@ -2378,43 +2393,24 @@ function restoreAdminSession() {
             }
 
 
-            /*
-               Only try to restore Admin mode
-               when this browser previously had
-               an Admin session.
-            */
+            /* =========================================
+               NO SAVED ADMIN SESSION
+            ========================================= */
 
-            const savedAdmin =
-                getCurrentAdmin();
-
-
-            const savedAdminLogin =
-                localStorage.getItem(
-                    "adminLoggedIn"
-                ) === "true";
-
-
-            if (
-                !savedAdmin ||
-                !savedAdminLogin
-            ) {
+            if (!savedAdmin) {
 
                 return;
             }
 
 
             /* =========================================
-               CHECK SAVED UID
+               SAVED ADMIN BELONGS TO DIFFERENT USER
             ========================================= */
 
             if (
-                savedAdmin.uid !==
-                user.uid
+                String(savedAdmin.uid || "") !==
+                String(user.uid)
             ) {
-
-                localStorage.removeItem(
-                    "adminLoggedIn"
-                );
 
                 localStorage.removeItem(
                     "currentAdmin"
@@ -2433,28 +2429,24 @@ function restoreAdminSession() {
                 ===================================== */
 
                 const adminDoc =
-                    await db.collection(
-                        "admins"
-                    )
-                    .doc(user.uid)
-                    .get();
+                    await db.collection("admins")
+                        .doc(user.uid)
+                        .get();
 
 
-                /* ADMIN DOCUMENT REMOVED */
+                /* =====================================
+                   ADMIN PROFILE REMOVED
+                ===================================== */
 
                 if (!adminDoc.exists) {
-
-                    localStorage.removeItem(
-                        "adminLoggedIn"
-                    );
 
                     localStorage.removeItem(
                         "currentAdmin"
                     );
 
+                    await auth.signOut();
 
                     updateNavigation();
-
 
                     console.warn(
                         "Admin profile not found."
@@ -2469,7 +2461,7 @@ function restoreAdminSession() {
 
 
                 /* =====================================
-                   VERIFY ADMIN ROLE
+                   VERIFY ADMIN ACCESS
                 ===================================== */
 
                 if (
@@ -2478,16 +2470,12 @@ function restoreAdminSession() {
                 ) {
 
                     localStorage.removeItem(
-                        "adminLoggedIn"
-                    );
-
-                    localStorage.removeItem(
                         "currentAdmin"
                     );
 
+                    await auth.signOut();
 
                     updateNavigation();
-
 
                     console.warn(
                         "Admin access is not active."
@@ -2525,12 +2513,6 @@ function restoreAdminSession() {
                     JSON.stringify(
                         currentAdmin
                     )
-                );
-
-
-                localStorage.setItem(
-                    "adminLoggedIn",
-                    "true"
                 );
 
 
@@ -2574,9 +2556,7 @@ async function adminLogout() {
     }
 
 
-    localStorage.removeItem(
-        "adminLoggedIn"
-    );
+   
 
 
     localStorage.removeItem(
