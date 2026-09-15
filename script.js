@@ -8499,7 +8499,6 @@ async function managerVerifyPayment(orderId) {
 
         await displayOrderDetails();
 
-        displayPurchaseHistory();
 
         displayCart();
 
@@ -8890,8 +8889,6 @@ async function managerRejectPayment(orderId) {
         await displayManagerPaymentOrders();
 
         await displayOrderDetails();
-
-        displayPurchaseHistory();
 
         updateDashboard();
 
@@ -13510,8 +13507,6 @@ async function confirmCODOrder(orderId) {
 
         await displayOrderDetails();
 
-        displayPurchaseHistory();
-
         displayBookDetails();
 
         updateDashboard();
@@ -13832,7 +13827,6 @@ async function verifyOrderPayment(orderId) {
 
         await displayOrderDetails();
 
-        displayPurchaseHistory();
 
         displayCart();
 
@@ -14084,8 +14078,6 @@ async function rejectOrderPayment(orderId) {
         ========================================= */
 
         await displayOrderDetails();
-
-        displayPurchaseHistory();
 
         updateDashboard();
 
