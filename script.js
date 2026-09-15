@@ -7094,6 +7094,27 @@ ${
 async function updateDashboard() {
 
     /* =========================================
+       ADMIN ONLY
+    ========================================= */
+
+    if (!isAdminLoggedIn()) {
+        return;
+    }
+
+
+    /* =========================================
+       BOOK COUNT FROM FIRESTORE
+    ========================================= */
+
+    try {
+
+        const bookSnapshot =
+            await db.collection("books")
+                .get();
+
+        // continue your existing code...
+
+    /* =========================================
    BOOK COUNT FROM FIRESTORE
 ========================================= */
 
