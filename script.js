@@ -7099,7 +7099,7 @@ async function updateDashboard() {
 
 
     /* =========================================
-       BOOK COUNT FROM FIRESTORE
+       BOOK COUNT
     ========================================= */
 
     try {
@@ -7108,161 +7108,135 @@ async function updateDashboard() {
             await db.collection("books")
                 .get();
 
-        // continue your existing code...
-
-    /* =========================================
-   BOOK COUNT FROM FIRESTORE
-========================================= */
-
-try {
-
-    const bookSnapshot =
-        await db.collection("books")
-            .get();
-
-
-    setText(
-        "totalBooks",
-        bookSnapshot.size
-    );
-
-
-    console.log(
-        "Total Firestore books:",
-        bookSnapshot.size
-    );
-
-}
-catch (error) {
-
-    console.error(
-        "Error loading book count:",
-        error
-    );
-
-
-    setText(
-        "totalBooks",
-        "-"
-    );
-}
-
-
-/* =========================================
-   CUSTOMER COUNT FROM FIRESTORE
-========================================= */
-
-try {
-
-    const customerSnapshot =
-        await db.collection("customers")
-            .get();
-
-
-    setText(
-        "totalCustomers",
-        customerSnapshot.size
-    );
-
-
-    console.log(
-        "Total Firestore customers:",
-        customerSnapshot.size
-    );
-
-}
-catch (error) {
-
-    console.error(
-        "Error loading customer count:",
-        error
-    );
-
-
-    setText(
-        "totalCustomers",
-        "-"
-    );
-}
-
-
-   /* =========================================
-   MANAGER COUNT FROM FIRESTORE
-========================================= */
-
-try {
-
-    const managerSnapshot =
-        await db.collection("managers")
-            .get();
-
-
-    setText(
-        "totalManagers",
-        managerSnapshot.size
-    );
-
-
-    console.log(
-        "Total Firestore Managers:",
-        managerSnapshot.size
-    );
-
-}
-
-  catch (error) {
-
-    console.error(
-        "Error loading Manager count:",
-        error
-    );
-
-
-    setText(
-        "totalManagers",
-        "-"
-    );
-}
-
-
-    /* =========================================
-       ORDER COUNT FROM FIRESTORE
-    ========================================= */
-
-    try {
-
-        const snapshot =
-            await db.collection("orders")
-                .get();
-
-
         setText(
-            "totalOrders",
-            snapshot.size
+            "totalBooks",
+            bookSnapshot.size
         );
 
-
         console.log(
-            "Total Firestore orders:",
-            snapshot.size
+            "Total Firestore books:",
+            bookSnapshot.size
         );
 
     }
     catch (error) {
 
-    console.error(
-        "Error loading order count:",
-        error
-    );
+        console.error(
+            "Error loading book count:",
+            error
+        );
+
+        setText(
+            "totalBooks",
+            "-"
+        );
+    }
 
 
-    setText(
-        "totalOrders",
-        "-"
-    );
+    /* =========================================
+       CUSTOMER COUNT
+    ========================================= */
+
+    try {
+
+        const customerSnapshot =
+            await db.collection("customers")
+                .get();
+
+        setText(
+            "totalCustomers",
+            customerSnapshot.size
+        );
+
+        console.log(
+            "Total Firestore customers:",
+            customerSnapshot.size
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error loading customer count:",
+            error
+        );
+
+        setText(
+            "totalCustomers",
+            "-"
+        );
+    }
+
+
+    /* =========================================
+       MANAGER COUNT
+    ========================================= */
+
+    try {
+
+        const managerSnapshot =
+            await db.collection("managers")
+                .get();
+
+        setText(
+            "totalManagers",
+            managerSnapshot.size
+        );
+
+        console.log(
+            "Total Firestore Managers:",
+            managerSnapshot.size
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error loading Manager count:",
+            error
+        );
+
+        setText(
+            "totalManagers",
+            "-"
+        );
+    }
+
+
+    /* =========================================
+       ORDER COUNT
+    ========================================= */
+
+    try {
+
+        const orderSnapshot =
+            await db.collection("orders")
+                .get();
+
+        setText(
+            "totalOrders",
+            orderSnapshot.size
+        );
+
+        console.log(
+            "Total Firestore orders:",
+            orderSnapshot.size
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error loading order count:",
+            error
+        );
+
+        setText(
+            "totalOrders",
+            "-"
+        );
+    }
 }
-}
-
 
 function setText(id, value) {
 
