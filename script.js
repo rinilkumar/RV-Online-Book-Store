@@ -37,8 +37,13 @@ console.log(db);
    LOCAL STORAGE INITIALIZATION
 ===================================================== */
 
+/* =====================================================
+   LOCAL STORAGE INITIALIZATION
+===================================================== */
+
 function initializeStorage() {
-  /* CART */
+
+    /* CART ONLY */
 
     if (!localStorage.getItem("cart")) {
 
@@ -47,23 +52,9 @@ function initializeStorage() {
             JSON.stringify([])
         );
     }
-
-/* =====================================================
-   CATEGORY RUNTIME CACHE
-===================================================== */
-
-let categoriesCache = [];
-
-
-function getCategories() {
-
-    return categoriesCache.slice();
-
 }
 
- 
 
-}
    
 
 /* =====================================================
@@ -104,12 +95,76 @@ function getSubcategories() {
     );
 }
 
-function getCurrentCustomer() {
-    return JSON.parse(
-        localStorage.getItem("currentCustomer")
-    );
-}
+/* =====================================================
+   GET AUTHENTICATED CUSTOMER
+===================================================== */
 
+function getCurrentCustomer() {
+
+    const storedCustomer =
+        localStorage.getItem(
+            "currentCustomer"
+        );
+
+
+    if (!storedCustomer) {
+        return null;
+    }
+
+
+    try {
+
+        const customer =
+            JSON.parse(
+                storedCustomer
+            );
+
+        const user =
+            auth.currentUser;
+
+
+        if (
+            !user ||
+            !customer
+        ) {
+            return null;
+        }
+
+
+        const customerUid =
+            customer.id ||
+            customer.uid ||
+            "";
+
+
+        if (
+            String(customerUid) !==
+            String(user.uid)
+        ) {
+
+            return null;
+        }
+
+
+        return customer;
+
+    }
+    catch (error) {
+
+        console.error(
+            "Current Customer data error:",
+            error
+        );
+
+
+        localStorage.removeItem(
+            "currentCustomer"
+        );
+
+
+        return null;
+    }
+}
 
 function getCurrentManager() {
 
@@ -8992,25 +9047,7 @@ catch (error) {
 }
 
 
-        container.innerHTML = `
-            <div class="empty-message">
-
-                <h3>
-                    Stock details could not be loaded.
-                </h3>
-
-                <p>
-                    Please check your connection
-                    and try again.
-                </p>
-
-            </div>
-        `;
-
-
-        return;
-    }
-
+      
 
     container.innerHTML = "";
 
@@ -12421,38 +12458,7 @@ catch (error) {
     return;
 }
 
-    container.innerHTML = `
-        <div class="empty-message">
-
-            <h3>
-                Book purchase details could not be loaded.
-            </h3>
-
-            <p>
-                Please check your connection
-                and try again.
-            </p>
-
-        </div>
-    `;
-
-
-    if (bottomContainer) {
-
-        bottomContainer.innerHTML = `
-            <div class="empty-message">
-
-                Order details could not be loaded.
-
-            </div>
-        `;
-
-    }
-
-
-    return;
-}
-
+    
     container.innerHTML = "";
 
 
