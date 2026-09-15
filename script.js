@@ -7089,146 +7089,151 @@ ${
 
 async function updateDashboard() {
 
-    /* =========================================
-       ADMIN ONLY
-    ========================================= */
+    /* ADMIN ONLY */
 
     if (!isAdminLoggedIn()) {
         return;
     }
 
+    const adminUser =
+        auth.currentUser;
 
-    /* =========================================
-       BOOK COUNT
-    ========================================= */
+    if (!adminUser) {
+        return;
+    }
+
+    const adminUid =
+        adminUser.uid;
+
 
     try {
+
+        /*
+           Load all dashboard counts together.
+           This also reduces the chance of requests
+           continuing after switching accounts.
+        */
+
+        const results =
+            await Promise.all([
+
+                db.collection("books")
+                    .get(),
+
+                db.collection("customers")
+                    .get(),
+
+                db.collection("managers")
+                    .get(),
+
+                db.collection("orders")
+                    .get()
+
+            ]);
+
+
+        /*
+           The user may have logged out or switched
+           accounts while Firestore was loading.
+        */
+
+        if (
+            !isAdminLoggedIn() ||
+            !auth.currentUser ||
+            auth.currentUser.uid !== adminUid
+        ) {
+            return;
+        }
+
 
         const bookSnapshot =
-            await db.collection("books")
-                .get();
-
-        setText(
-            "totalBooks",
-            bookSnapshot.size
-        );
-
-        console.log(
-            "Total Firestore books:",
-            bookSnapshot.size
-        );
-
-    }
-    catch (error) {
-
-        console.error(
-            "Error loading book count:",
-            error
-        );
-
-        setText(
-            "totalBooks",
-            "-"
-        );
-    }
-
-
-    /* =========================================
-       CUSTOMER COUNT
-    ========================================= */
-
-    try {
+            results[0];
 
         const customerSnapshot =
-            await db.collection("customers")
-                .get();
-
-        setText(
-            "totalCustomers",
-            customerSnapshot.size
-        );
-
-        console.log(
-            "Total Firestore customers:",
-            customerSnapshot.size
-        );
-
-    }
-    catch (error) {
-
-        console.error(
-            "Error loading customer count:",
-            error
-        );
-
-        setText(
-            "totalCustomers",
-            "-"
-        );
-    }
-
-
-    /* =========================================
-       MANAGER COUNT
-    ========================================= */
-
-    try {
+            results[1];
 
         const managerSnapshot =
-            await db.collection("managers")
-                .get();
-
-        setText(
-            "totalManagers",
-            managerSnapshot.size
-        );
-
-        console.log(
-            "Total Firestore Managers:",
-            managerSnapshot.size
-        );
-
-    }
-    catch (error) {
-
-        console.error(
-            "Error loading Manager count:",
-            error
-        );
-
-        setText(
-            "totalManagers",
-            "-"
-        );
-    }
-
-
-    /* =========================================
-       ORDER COUNT
-    ========================================= */
-
-    try {
+            results[2];
 
         const orderSnapshot =
-            await db.collection("orders")
-                .get();
+            results[3];
+
+
+        setText(
+            "totalBooks",
+            bookSnapshot.size
+        );
+
+        setText(
+            "totalCustomers",
+            customerSnapshot.size
+        );
+
+        setText(
+            "totalManagers",
+            managerSnapshot.size
+        );
 
         setText(
             "totalOrders",
             orderSnapshot.size
         );
 
+
         console.log(
-            "Total Firestore orders:",
-            orderSnapshot.size
+            "Admin dashboard counts:",
+            {
+                books:
+                    bookSnapshot.size,
+
+                customers:
+                    customerSnapshot.size,
+
+                managers:
+                    managerSnapshot.size,
+
+                orders:
+                    orderSnapshot.size
+            }
         );
 
     }
     catch (error) {
 
+        /*
+           If Admin logged out while these requests
+           were running, do not show a false
+           permission error in Console.
+        */
+
+        if (
+            !isAdminLoggedIn() ||
+            !auth.currentUser ||
+            auth.currentUser.uid !== adminUid
+        ) {
+            return;
+        }
+
+
         console.error(
-            "Error loading order count:",
+            "Admin dashboard count error:",
             error
+        );
+
+
+        setText(
+            "totalBooks",
+            "-"
+        );
+
+        setText(
+            "totalCustomers",
+            "-"
+        );
+
+        setText(
+            "totalManagers",
+            "-"
         );
 
         setText(
@@ -7373,7 +7378,7 @@ async function loadManagerDashboard() {
         /* =========================================
            LOAD STORE DATA FROM FIRESTORE
         ========================================= */
-
+updateDashboard()
         const results =
             await Promise.all([
 
@@ -14497,19 +14502,15 @@ document.addEventListener(
 
        await loadSubcategoriesFromFirestore();
 
-       restoreCustomerSession();
-
-       restoreManagerSession();
-
-       restoreAdminSession();
-
        await startAuthSessionObserver();
 
-loadCategoryFilter();
-loadAdminCategories();
+      loadCategoryFilter();
 
-updateNavigation();
-        updateCartCount();
+       loadAdminCategories();
+
+       updateNavigation();
+       
+       updateCartCount();
 
         displayBooks();
 
