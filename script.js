@@ -6382,8 +6382,6 @@ catch (error) {
 
     displayCart();
 
-    updateDashboard();
-
 
     // ==========================================
     // GENERATE RECEIPT
@@ -6580,9 +6578,7 @@ catch (error) {
     displayBooks();
 
     displayCart();
-
-    updateDashboard();
-
+   
     generateReceipt(order);
 
 
