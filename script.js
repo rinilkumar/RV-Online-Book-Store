@@ -924,8 +924,10 @@ async function managerLogin(event) {
         }
 
 
-        const manager =
-            managerDoc.data();
+  const manager = {
+    ...managerDoc.data(),
+    uid: managerDoc.id
+};
 
 
         /* =========================================
@@ -1619,9 +1621,6 @@ async function registerCustomer(event) {
         showAccountForm(
             "customerLoginForm"
         );
-
-
-        updateDashboard();
 
     }
     catch (error) {
@@ -3738,10 +3737,8 @@ try {
 
     /* Keep local copy for old functions */
 
-    localStorage.setItem(
-        "categories",
-        JSON.stringify(categories)
-    );
+  categoriesCache =
+    categories.slice();
 
     console.log(
         "Categories saved to Firestore:",
@@ -7378,7 +7375,6 @@ async function loadManagerDashboard() {
         /* =========================================
            LOAD STORE DATA FROM FIRESTORE
         ========================================= */
-updateDashboard()
         const results =
             await Promise.all([
 
@@ -8483,9 +8479,6 @@ async function managerVerifyPayment(orderId) {
 
         displayBookDetails();
 
-        updateDashboard();
-
-
         alert(
             "Payment verified successfully!\n\n" +
 
@@ -8868,8 +8861,6 @@ async function managerRejectPayment(orderId) {
         await displayManagerPaymentOrders();
 
         await displayOrderDetails();
-
-        updateDashboard();
 
 
         alert(
@@ -9339,8 +9330,6 @@ async function updateManagerStock(bookId) {
         displayBooks();
 
         displayAdminBooks();
-
-        updateDashboard();
 
 
         alert(
@@ -14515,8 +14504,6 @@ document.addEventListener(
         displayBooks();
 
         displayCart();
-
-        updateDashboard();
 
         showPage("home");
     }
