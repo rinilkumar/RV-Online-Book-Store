@@ -72,18 +72,19 @@ body {
 }
 
 
-/* =========================================
-   MANAGER LOGOUT BUTTON - TOP RIGHT
-========================================= */
+/* =====================================================
+   ADMIN + MANAGER LOGOUT BUTTON - TOP RIGHT
+===================================================== */
 
-#managerDashboard .section {
+.admin-dashboard {
     position: relative;
 }
 
 .mng {
     position: absolute;
-    top: 150px;
-    right: 100px;
+
+    top: 20px;
+    right: 20px;
 
     background: #ff8c00;
     color: white;
@@ -92,25 +93,38 @@ body {
     border-radius: 6px;
 
     padding: 10px 18px;
+
     font-size: 14px;
     font-weight: 600;
 
     cursor: pointer;
+
+    z-index: 10;
+
+    transition: 0.2s;
 }
 
 .mng:hover {
     background: #e67e00;
-}
-button,
-input,
-select,
-textarea {
-    font-family: inherit;
+    transform: translateY(-1px);
 }
 
-button {
-    cursor: pointer;
+
+/* MOBILE */
+
+@media (max-width: 600px) {
+
+    .mng {
+        top: 15px;
+        right: 15px;
+
+        padding: 8px 12px;
+
+        font-size: 12px;
+    }
 }
+
+
 
 
 /* =====================================================
