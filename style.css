@@ -3587,3 +3587,81 @@ footer {
         width: 100%;
     }
 }
+
+
+/* =====================================================
+   DOWNLOAD RECEIPT BUTTON
+===================================================== */
+
+.history-receipt-actions {
+    margin-top: 18px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+
+.download-receipt-btn {
+    border: none;
+    outline: none;
+
+    padding: 11px 18px;
+
+    border-radius: 8px;
+
+    background: linear-gradient(
+        135deg,
+        #1976d2,
+        #0d47a1
+    );
+
+    color: white;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 4px 12px
+        rgba(25, 118, 210, 0.25);
+
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        opacity 0.2s ease;
+}
+
+
+.download-receipt-btn:hover {
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 7px 16px
+        rgba(25, 118, 210, 0.35);
+}
+
+
+.download-receipt-btn:active {
+    transform: translateY(0);
+}
+
+
+.download-receipt-btn:focus {
+    box-shadow:
+        0 0 0 3px
+        rgba(25, 118, 210, 0.20);
+}
+
+
+/* MOBILE */
+
+@media (max-width: 600px) {
+
+    .history-receipt-actions {
+        justify-content: stretch;
+    }
+
+    .download-receipt-btn {
+        width: 100%;
+    }
+}
