@@ -4721,6 +4721,46 @@ function calculateCartTotal() {
     );
 }
 
+/* =====================================================
+   TOTAL BOOK QUANTITY IN CART
+===================================================== */
+
+function getTotalBookQuantity(items) {
+
+    return items.reduce(
+        function (total, book) {
+
+            const quantity =
+                Number(book.quantity) || 1;
+
+            return total + quantity;
+        },
+        0
+    );
+}
+
+
+/* =====================================================
+   DISCOUNT PERCENTAGE
+===================================================== */
+
+function getDiscountPercent(totalBooks) {
+
+    if (totalBooks >= 15) {
+        return 10;
+    }
+
+    if (totalBooks >= 10) {
+        return 5;
+    }
+
+    if (totalBooks >= 6) {
+        return 3;
+    }
+
+    return 0;
+}
+
 
 /* =====================================================
    DISPLAY CART - LATEST FIRESTORE STOCK
@@ -6034,15 +6074,68 @@ async function buildFreshOrderData(cart) {
     }
 
 
-    return {
+    /* =========================================
+   CALCULATE DISCOUNT
+========================================= */
 
-        books:
-            orderBooks,
+const subtotal =
+    Number(
+        total.toFixed(2)
+    );
 
-        total:
-            total
 
-    };
+const totalBooks =
+    getTotalBookQuantity(
+        orderBooks
+    );
+
+
+const discountPercent =
+    getDiscountPercent(
+        totalBooks
+    );
+
+
+const discountAmount =
+    Number(
+        (
+            subtotal *
+            discountPercent /
+            100
+        ).toFixed(2)
+    );
+
+
+const finalTotal =
+    Number(
+        (
+            subtotal -
+            discountAmount
+        ).toFixed(2)
+    );
+
+
+return {
+
+    books:
+        orderBooks,
+
+    subtotal:
+        subtotal,
+
+    totalBooks:
+        totalBooks,
+
+    discountPercent:
+        discountPercent,
+
+    discountAmount:
+        discountAmount,
+
+    total:
+        finalTotal
+
+};
 }
 //==========================================
 // Confirm Online Payment
@@ -6297,10 +6390,22 @@ catch (error) {
         address:
             customer.address,
 
-       books:
+     books:
     freshOrderData.books,
 
-       total:
+subtotal:
+    freshOrderData.subtotal,
+
+totalBooks:
+    freshOrderData.totalBooks,
+
+discountPercent:
+    freshOrderData.discountPercent,
+
+discountAmount:
+    freshOrderData.discountAmount,
+
+total:
     freshOrderData.total,
 
         paymentMethod:
@@ -6509,10 +6614,22 @@ catch (error) {
         address:
             customer.address,
 
-      books:
+    books:
     freshOrderData.books,
 
-        total:
+subtotal:
+    freshOrderData.subtotal,
+
+totalBooks:
+    freshOrderData.totalBooks,
+
+discountPercent:
+    freshOrderData.discountPercent,
+
+discountAmount:
+    freshOrderData.discountAmount,
+
+total:
     freshOrderData.total,
 
         paymentMethod:
