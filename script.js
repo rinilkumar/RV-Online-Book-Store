@@ -7098,7 +7098,7 @@ async function downloadPurchaseReceipt(orderId) {
 
 
 /* =====================================================
-   CREATE PURCHASE RECEIPT PDF
+   CREATE PURCHASE RECEIPT PDF - DESIGNED VERSION
 ===================================================== */
 
 function createPurchaseReceiptPDF(order) {
@@ -7107,29 +7107,20 @@ function createPurchaseReceiptPDF(order) {
         !window.jspdf ||
         !window.jspdf.jsPDF
     ) {
-
-        alert(
-            "PDF library could not be loaded."
-        );
-
+        alert("PDF library could not be loaded.");
         return;
     }
 
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF();
 
-    const {
-        jsPDF
-    } = window.jspdf;
-
-
-    const pdf =
-        new jsPDF();
-
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
 
     let y = 20;
 
-
     /* =========================================
-       RECEIPT VALUES
+       SAFE ORDER DATA
     ========================================= */
 
     const books =
@@ -7137,13 +7128,11 @@ function createPurchaseReceiptPDF(order) {
             ? order.books
             : [];
 
-
     const totalBooks =
         Number(
             order.totalBooks ??
             getTotalBookQuantity(books)
         );
-
 
     const subtotal =
         Number(
@@ -7152,170 +7141,159 @@ function createPurchaseReceiptPDF(order) {
             0
         );
 
-
     const discountPercent =
-        Number(
-            order.discountPercent || 0
-        );
-
+        Number(order.discountPercent || 0);
 
     const discountAmount =
-        Number(
-            order.discountAmount || 0
-        );
-
+        Number(order.discountAmount || 0);
 
     const finalTotal =
-        Number(
-            order.total || 0
-        );
-
+        Number(order.total || 0);
 
     const address =
         order.address || {};
 
+    const customerName =
+        order.customer || "-";
+
+    const customerEmail =
+        order.email || "-";
+
+    const customerPhone =
+        order.phone || "-";
+
+    const paymentMethod =
+        order.paymentMethod || "-";
+
+    const paymentStatus =
+        order.paymentStatus || "-";
+
+    const orderStatus =
+        order.status || "-";
+
+    const orderDate =
+        order.date || "-";
+
+    const orderId =
+        order.id || "-";
+
+    const transactionId =
+        order.transactionId || "-";
 
     /* =========================================
-       STORE TITLE
+       COLORS
     ========================================= */
 
-    pdf.setFontSize(20);
-
-    pdf.text(
-        "RV BOOK STORE",
-        105,
-        y,
-        {
-            align: "center"
-        }
-    );
-
-
-    y += 10;
-
-
-    pdf.setFontSize(15);
-
-    pdf.text(
-        "Purchase Receipt",
-        105,
-        y,
-        {
-            align: "center"
-        }
-    );
-
-
-    y += 12;
-
-
-    pdf.setFontSize(11);
-
+    const primary = [41, 128, 185];      // blue
+    const dark = [44, 62, 80];           // dark text
+    const lightBg = [245, 248, 250];     // soft gray
+    const border = [220, 225, 230];
+    const success = [39, 174, 96];
+    const danger = [192, 57, 43];
+    const warning = [243, 156, 18];
 
     /* =========================================
-       ORDER DETAILS
+       HELPERS
     ========================================= */
 
-    pdf.text(
-        "Order No: " +
-        String(order.id || "-"),
-        20,
-        y
-    );
+    function drawSectionTitle(title) {
+        pdf.setFillColor(primary[0], primary[1], primary[2]);
+        pdf.rect(14, y, pageWidth - 28, 8, "F");
 
-    y += 7;
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(11);
+        pdf.text(title, 18, y + 5.5);
 
-
-    pdf.text(
-        "Customer: " +
-        String(order.customer || "-"),
-        20,
-        y
-    );
-
-    y += 7;
-
-
-    pdf.text(
-        "Date: " +
-        String(order.date || "-"),
-        20,
-        y
-    );
-
-    y += 7;
-
-
-    pdf.text(
-        "Payment Method: " +
-        String(
-            order.paymentMethod || "-"
-        ),
-        20,
-        y
-    );
-
-    y += 7;
-
-
-    if (
-        order.paymentMethod === "UPI"
-    ) {
-
-        pdf.text(
-            "Transaction ID: " +
-            String(
-                order.transactionId || "-"
-            ),
-            20,
-            y
-        );
-
-        y += 7;
-
-
-        pdf.text(
-            "Payment Status: " +
-            String(
-                order.paymentStatus ||
-                "Pending Verification"
-            ),
-            20,
-            y
-        );
-
-        y += 7;
+        y += 12;
     }
 
+    function drawLabelValue(label, value) {
+        pdf.setTextColor(dark[0], dark[1], dark[2]);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(10);
+        pdf.text(label, 18, y);
 
-    pdf.text(
-        "Order Status: " +
-        String(order.status || "-"),
-        20,
-        y
-    );
+        pdf.setFont("helvetica", "normal");
+        pdf.text(String(value), 70, y);
 
+        y += 6;
+    }
 
-    y += 10;
+    function drawDivider() {
+        pdf.setDrawColor(border[0], border[1], border[2]);
+        pdf.line(16, y, pageWidth - 16, y);
+        y += 6;
+    }
 
+    function ensureSpace(spaceNeeded) {
+        if (y + spaceNeeded > pageHeight - 20) {
+            pdf.addPage();
+            y = 20;
+        }
+    }
+
+    /* =========================================
+       HEADER
+    ========================================= */
+
+    pdf.setFillColor(primary[0], primary[1], primary[2]);
+    pdf.rect(0, 0, pageWidth, 32, "F");
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(20);
+    pdf.text("RV BOOK STORE", 14, 15);
+
+    pdf.setFontSize(11);
+    pdf.setFont("helvetica", "normal");
+    pdf.text("Customer Purchase Receipt", 14, 23);
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.text("Receipt", pageWidth - 35, 15);
+
+    pdf.setFont("helvetica", "normal");
+    pdf.text("Order: " + orderId, pageWidth - 55, 23);
+
+    y = 40;
+
+    /* =========================================
+       ORDER INFORMATION
+    ========================================= */
+
+    drawSectionTitle("ORDER INFORMATION");
+
+    drawLabelValue("Order ID", orderId);
+    drawLabelValue("Order Date", orderDate);
+    drawLabelValue("Payment Method", paymentMethod);
+
+    if (paymentMethod === "UPI") {
+        drawLabelValue("Transaction ID", transactionId);
+        drawLabelValue("Payment Status", paymentStatus);
+    }
+
+    drawLabelValue("Order Status", orderStatus);
+
+    drawDivider();
+
+    /* =========================================
+       CUSTOMER INFORMATION
+    ========================================= */
+
+    drawSectionTitle("CUSTOMER INFORMATION");
+
+    drawLabelValue("Customer Name", customerName);
+    drawLabelValue("Email", customerEmail);
+    drawLabelValue("Phone", customerPhone);
+
+    drawDivider();
 
     /* =========================================
        DELIVERY ADDRESS
     ========================================= */
 
-    pdf.setFontSize(13);
-
-    pdf.text(
-        "Delivery Address",
-        20,
-        y
-    );
-
-
-    y += 7;
-
-    pdf.setFontSize(11);
-
+    drawSectionTitle("DELIVERY ADDRESS");
 
     const addressLines = [
         address.name || "",
@@ -7323,254 +7301,197 @@ function createPurchaseReceiptPDF(order) {
         address.address || "",
         (
             (address.city || "") +
-            " " +
+            ", " +
             (address.state || "")
-        ).trim(),
+        ).replace(/^,\s*|,\s*$/g, ""),
         address.pincode || ""
     ].filter(Boolean);
 
+    pdf.setTextColor(dark[0], dark[1], dark[2]);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
 
-    addressLines.forEach(
-        function (line) {
+    if (addressLines.length === 0) {
+        pdf.text("No address available", 18, y);
+        y += 6;
+    } else {
+        addressLines.forEach(function (line) {
+            const wrapped =
+                pdf.splitTextToSize(String(line), 170);
 
-            pdf.text(
-                String(line),
-                20,
-                y
-            );
+            pdf.text(wrapped, 18, y);
+            y += wrapped.length * 5;
+        });
+    }
 
-            y += 6;
-        }
-    );
-
-
-    y += 5;
-
+    y += 2;
+    drawDivider();
 
     /* =========================================
        PURCHASED BOOKS
     ========================================= */
 
-    pdf.setFontSize(13);
+    drawSectionTitle("PURCHASED BOOKS");
 
-    pdf.text(
-        "Purchased Books",
-        20,
-        y
-    );
+    pdf.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+    pdf.setDrawColor(border[0], border[1], border[2]);
+    pdf.rect(14, y, pageWidth - 28, 9, "FD");
 
-
-    y += 8;
-
+    pdf.setTextColor(dark[0], dark[1], dark[2]);
+    pdf.setFont("helvetica", "bold");
     pdf.setFontSize(10);
 
-
-    books.forEach(
-        function (book, index) {
-
-            const quantity =
-                Number(
-                    book.quantity
-                ) || 1;
-
-
-            const price =
-                Number(
-                    book.price
-                ) || 0;
-
-
-            const bookTotal =
-                price *
-                quantity;
-
-
-            /*
-               Add new page if receipt gets long.
-            */
-
-            if (y > 270) {
-
-                pdf.addPage();
-
-                y = 20;
-            }
-
-
-            const title =
-                String(
-                    book.title ||
-                    "Book"
-                );
-
-
-            const titleLines =
-                pdf.splitTextToSize(
-                    (index + 1) +
-                    ". " +
-                    title,
-                    165
-                );
-
-
-            pdf.text(
-                titleLines,
-                20,
-                y
-            );
-
-
-            y +=
-                titleLines.length *
-                5;
-
-
-            pdf.text(
-                "   Rs." +
-                price.toFixed(2) +
-                " x " +
-                quantity +
-                " = Rs." +
-                bookTotal.toFixed(2),
-                20,
-                y
-            );
-
-
-            y += 8;
-        }
-    );
-
-
-    /* =========================================
-       PRICE SUMMARY
-    ========================================= */
-
-    if (y > 235) {
-
-        pdf.addPage();
-
-        y = 20;
-    }
-
-
-    y += 3;
-
-
-    pdf.line(
-        20,
-        y,
-        190,
-        y
-    );
-
-
-    y += 8;
-
-
-    pdf.setFontSize(11);
-
-
-    pdf.text(
-        "Total Books: " +
-        totalBooks,
-        20,
-        y
-    );
-
-
-    y += 7;
-
-
-    pdf.text(
-        "Subtotal: Rs." +
-        subtotal.toFixed(2),
-        20,
-        y
-    );
-
-
-    y += 7;
-
-
-    if (
-        discountPercent > 0
-    ) {
-
-        pdf.text(
-            "Discount: " +
-            discountPercent +
-            "%",
-            20,
-            y
-        );
-
-        y += 7;
-
-
-        pdf.text(
-            "You Saved: Rs." +
-            discountAmount.toFixed(2),
-            20,
-            y
-        );
-
-        y += 7;
-    }
-    else {
-
-        pdf.text(
-            "Discount: No discount",
-            20,
-            y
-        );
-
-        y += 7;
-    }
-
-
-    pdf.setFontSize(14);
-
-    pdf.text(
-        "Final Total: Rs." +
-        finalTotal.toFixed(2),
-        20,
-        y
-    );
-
+    pdf.text("Book", 18, y + 6);
+    pdf.text("Qty", 125, y + 6);
+    pdf.text("Price", 145, y + 6);
+    pdf.text("Total", 173, y + 6);
 
     y += 12;
 
+    books.forEach(function (book, index) {
 
-    pdf.setFontSize(9);
+        ensureSpace(18);
 
-    pdf.text(
-        "Thank you for shopping with RV Book Store.",
-        105,
-        y,
-        {
-            align: "center"
-        }
-    );
+        const quantity =
+            Number(book.quantity) || 1;
 
+        const price =
+            Number(book.price) || 0;
+
+        const bookTotal =
+            price * quantity;
+
+        const title =
+            (index + 1) + ". " + String(book.title || "Book");
+
+        const titleLines =
+            pdf.splitTextToSize(title, 100);
+
+        const rowHeight =
+            Math.max(10, titleLines.length * 5 + 2);
+
+        pdf.setDrawColor(border[0], border[1], border[2]);
+        pdf.rect(14, y - 2, pageWidth - 28, rowHeight, "S");
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(10);
+        pdf.setTextColor(dark[0], dark[1], dark[2]);
+
+        pdf.text(titleLines, 18, y + 2);
+        pdf.text(String(quantity), 127, y + 2);
+        pdf.text("Rs." + price.toFixed(2), 142, y + 2);
+        pdf.text("Rs." + bookTotal.toFixed(2), 170, y + 2);
+
+        y += rowHeight + 3;
+    });
+
+    y += 2;
 
     /* =========================================
-       DOWNLOAD PDF
+       PRICE SUMMARY BOX
+    ========================================= */
+
+    ensureSpace(50);
+
+    pdf.setFillColor(248, 249, 250);
+    pdf.setDrawColor(border[0], border[1], border[2]);
+    pdf.roundedRect(110, y, 85, 40, 3, 3, "FD");
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.setTextColor(dark[0], dark[1], dark[2]);
+    pdf.text("PRICE SUMMARY", 118, y + 7);
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
+
+    pdf.text("Total Books:", 118, y + 15);
+    pdf.text(String(totalBooks), 180, y + 15, { align: "right" });
+
+    pdf.text("Subtotal:", 118, y + 22);
+    pdf.text("Rs." + subtotal.toFixed(2), 180, y + 22, { align: "right" });
+
+    if (discountPercent > 0) {
+        pdf.text("Discount (" + discountPercent + "%):", 118, y + 29);
+        pdf.text("- Rs." + discountAmount.toFixed(2), 180, y + 29, { align: "right" });
+    } else {
+        pdf.text("Discount:", 118, y + 29);
+        pdf.text("No discount", 180, y + 29, { align: "right" });
+    }
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(primary[0], primary[1], primary[2]);
+    pdf.text("Final Total:", 118, y + 36);
+    pdf.text("Rs." + finalTotal.toFixed(2), 180, y + 36, { align: "right" });
+
+    y += 50;
+
+    /* =========================================
+       STATUS BOX
+    ========================================= */
+
+    ensureSpace(18);
+
+    let statusColor = success;
+
+    if (
+        String(orderStatus).toLowerCase().includes("pending")
+    ) {
+        statusColor = warning;
+    }
+
+    if (
+        String(orderStatus).toLowerCase().includes("failed") ||
+        String(paymentStatus).toLowerCase().includes("rejected")
+    ) {
+        statusColor = danger;
+    }
+
+    pdf.setFillColor(statusColor[0], statusColor[1], statusColor[2]);
+    pdf.roundedRect(14, y, pageWidth - 28, 12, 2, 2, "F");
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.text(
+        "Current Order Status: " + orderStatus,
+        18,
+        y + 7.5
+    );
+
+    y += 20;
+
+    /* =========================================
+       FOOTER
+    ========================================= */
+
+    pdf.setTextColor(100, 100, 100);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.text(
+        "Thank you for shopping with RV Book Store.",
+        pageWidth / 2,
+        y,
+        { align: "center" }
+    );
+
+    pdf.text(
+        "This is a computer-generated receipt.",
+        pageWidth / 2,
+        y + 5,
+        { align: "center" }
+    );
+
+    /* =========================================
+       DOWNLOAD
     ========================================= */
 
     const safeOrderId =
-        String(
-            order.id || "Receipt"
-        ).replace(
-            /[^a-zA-Z0-9_-]/g,
-            ""
-        );
-
+        String(order.id || "Receipt")
+            .replace(/[^a-zA-Z0-9_-]/g, "");
 
     pdf.save(
-        "Receipt-" +
-        safeOrderId +
-        ".pdf"
+        "Receipt-" + safeOrderId + ".pdf"
     );
 }
 
