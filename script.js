@@ -7015,6 +7015,564 @@ function downloadReceipt() {
     window.print();
 }
 
+/* =====================================================
+   DOWNLOAD PURCHASE HISTORY RECEIPT
+===================================================== */
+
+async function downloadPurchaseReceipt(orderId) {
+
+    const customer =
+        getCurrentCustomer();
+
+
+    if (!customer) {
+
+        alert(
+            "Please login to download your receipt."
+        );
+
+        return;
+    }
+
+
+    try {
+
+        const orderDoc =
+            await db.collection("orders")
+                .doc(String(orderId))
+                .get();
+
+
+        if (!orderDoc.exists) {
+
+            alert(
+                "Order not found."
+            );
+
+            return;
+        }
+
+
+        const order = {
+            ...orderDoc.data(),
+            id: orderDoc.id
+        };
+
+
+        /* =========================================
+           SECURITY CHECK
+        ========================================= */
+
+        if (
+            String(order.customerId) !==
+            String(customer.id)
+        ) {
+
+            alert(
+                "You can only download your own receipt."
+            );
+
+            return;
+        }
+
+
+        createPurchaseReceiptPDF(
+            order
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Receipt download error:",
+            error
+        );
+
+
+        alert(
+            "Receipt could not be downloaded."
+        );
+    }
+}
+
+
+/* =====================================================
+   CREATE PURCHASE RECEIPT PDF
+===================================================== */
+
+function createPurchaseReceiptPDF(order) {
+
+    if (
+        !window.jspdf ||
+        !window.jspdf.jsPDF
+    ) {
+
+        alert(
+            "PDF library could not be loaded."
+        );
+
+        return;
+    }
+
+
+    const {
+        jsPDF
+    } = window.jspdf;
+
+
+    const pdf =
+        new jsPDF();
+
+
+    let y = 20;
+
+
+    /* =========================================
+       RECEIPT VALUES
+    ========================================= */
+
+    const books =
+        Array.isArray(order.books)
+            ? order.books
+            : [];
+
+
+    const totalBooks =
+        Number(
+            order.totalBooks ??
+            getTotalBookQuantity(books)
+        );
+
+
+    const subtotal =
+        Number(
+            order.subtotal ??
+            order.total ??
+            0
+        );
+
+
+    const discountPercent =
+        Number(
+            order.discountPercent || 0
+        );
+
+
+    const discountAmount =
+        Number(
+            order.discountAmount || 0
+        );
+
+
+    const finalTotal =
+        Number(
+            order.total || 0
+        );
+
+
+    const address =
+        order.address || {};
+
+
+    /* =========================================
+       STORE TITLE
+    ========================================= */
+
+    pdf.setFontSize(20);
+
+    pdf.text(
+        "RV BOOK STORE",
+        105,
+        y,
+        {
+            align: "center"
+        }
+    );
+
+
+    y += 10;
+
+
+    pdf.setFontSize(15);
+
+    pdf.text(
+        "Purchase Receipt",
+        105,
+        y,
+        {
+            align: "center"
+        }
+    );
+
+
+    y += 12;
+
+
+    pdf.setFontSize(11);
+
+
+    /* =========================================
+       ORDER DETAILS
+    ========================================= */
+
+    pdf.text(
+        "Order No: " +
+        String(order.id || "-"),
+        20,
+        y
+    );
+
+    y += 7;
+
+
+    pdf.text(
+        "Customer: " +
+        String(order.customer || "-"),
+        20,
+        y
+    );
+
+    y += 7;
+
+
+    pdf.text(
+        "Date: " +
+        String(order.date || "-"),
+        20,
+        y
+    );
+
+    y += 7;
+
+
+    pdf.text(
+        "Payment Method: " +
+        String(
+            order.paymentMethod || "-"
+        ),
+        20,
+        y
+    );
+
+    y += 7;
+
+
+    if (
+        order.paymentMethod === "UPI"
+    ) {
+
+        pdf.text(
+            "Transaction ID: " +
+            String(
+                order.transactionId || "-"
+            ),
+            20,
+            y
+        );
+
+        y += 7;
+
+
+        pdf.text(
+            "Payment Status: " +
+            String(
+                order.paymentStatus ||
+                "Pending Verification"
+            ),
+            20,
+            y
+        );
+
+        y += 7;
+    }
+
+
+    pdf.text(
+        "Order Status: " +
+        String(order.status || "-"),
+        20,
+        y
+    );
+
+
+    y += 10;
+
+
+    /* =========================================
+       DELIVERY ADDRESS
+    ========================================= */
+
+    pdf.setFontSize(13);
+
+    pdf.text(
+        "Delivery Address",
+        20,
+        y
+    );
+
+
+    y += 7;
+
+    pdf.setFontSize(11);
+
+
+    const addressLines = [
+        address.name || "",
+        address.phone || "",
+        address.address || "",
+        (
+            (address.city || "") +
+            " " +
+            (address.state || "")
+        ).trim(),
+        address.pincode || ""
+    ].filter(Boolean);
+
+
+    addressLines.forEach(
+        function (line) {
+
+            pdf.text(
+                String(line),
+                20,
+                y
+            );
+
+            y += 6;
+        }
+    );
+
+
+    y += 5;
+
+
+    /* =========================================
+       PURCHASED BOOKS
+    ========================================= */
+
+    pdf.setFontSize(13);
+
+    pdf.text(
+        "Purchased Books",
+        20,
+        y
+    );
+
+
+    y += 8;
+
+    pdf.setFontSize(10);
+
+
+    books.forEach(
+        function (book, index) {
+
+            const quantity =
+                Number(
+                    book.quantity
+                ) || 1;
+
+
+            const price =
+                Number(
+                    book.price
+                ) || 0;
+
+
+            const bookTotal =
+                price *
+                quantity;
+
+
+            /*
+               Add new page if receipt gets long.
+            */
+
+            if (y > 270) {
+
+                pdf.addPage();
+
+                y = 20;
+            }
+
+
+            const title =
+                String(
+                    book.title ||
+                    "Book"
+                );
+
+
+            const titleLines =
+                pdf.splitTextToSize(
+                    (index + 1) +
+                    ". " +
+                    title,
+                    165
+                );
+
+
+            pdf.text(
+                titleLines,
+                20,
+                y
+            );
+
+
+            y +=
+                titleLines.length *
+                5;
+
+
+            pdf.text(
+                "   Rs." +
+                price.toFixed(2) +
+                " x " +
+                quantity +
+                " = Rs." +
+                bookTotal.toFixed(2),
+                20,
+                y
+            );
+
+
+            y += 8;
+        }
+    );
+
+
+    /* =========================================
+       PRICE SUMMARY
+    ========================================= */
+
+    if (y > 235) {
+
+        pdf.addPage();
+
+        y = 20;
+    }
+
+
+    y += 3;
+
+
+    pdf.line(
+        20,
+        y,
+        190,
+        y
+    );
+
+
+    y += 8;
+
+
+    pdf.setFontSize(11);
+
+
+    pdf.text(
+        "Total Books: " +
+        totalBooks,
+        20,
+        y
+    );
+
+
+    y += 7;
+
+
+    pdf.text(
+        "Subtotal: Rs." +
+        subtotal.toFixed(2),
+        20,
+        y
+    );
+
+
+    y += 7;
+
+
+    if (
+        discountPercent > 0
+    ) {
+
+        pdf.text(
+            "Discount: " +
+            discountPercent +
+            "%",
+            20,
+            y
+        );
+
+        y += 7;
+
+
+        pdf.text(
+            "You Saved: Rs." +
+            discountAmount.toFixed(2),
+            20,
+            y
+        );
+
+        y += 7;
+    }
+    else {
+
+        pdf.text(
+            "Discount: No discount",
+            20,
+            y
+        );
+
+        y += 7;
+    }
+
+
+    pdf.setFontSize(14);
+
+    pdf.text(
+        "Final Total: Rs." +
+        finalTotal.toFixed(2),
+        20,
+        y
+    );
+
+
+    y += 12;
+
+
+    pdf.setFontSize(9);
+
+    pdf.text(
+        "Thank you for shopping with RV Book Store.",
+        105,
+        y,
+        {
+            align: "center"
+        }
+    );
+
+
+    /* =========================================
+       DOWNLOAD PDF
+    ========================================= */
+
+    const safeOrderId =
+        String(
+            order.id || "Receipt"
+        ).replace(
+            /[^a-zA-Z0-9_-]/g,
+            ""
+        );
+
+
+    pdf.save(
+        "Receipt-" +
+        safeOrderId +
+        ".pdf"
+    );
+}
+
 
 /* =====================================================
    PURCHASE HISTORY
@@ -7423,6 +7981,19 @@ ${
 
     ${order.status}
 </p>
+
+<div class="history-receipt-actions">
+
+    <button
+        type="button"
+        class="btn download-receipt-btn"
+        onclick="downloadPurchaseReceipt('${order.id}')"
+    >
+        📄 Download Receipt
+    </button>
+
+</div>
+
 
                 `;
 
