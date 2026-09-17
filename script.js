@@ -5710,40 +5710,130 @@ catch (error) {
 
 
 /* =====================================================
-   PAYMENT TOTAL
+   PAYMENT TOTAL WITH DISCOUNT
 ===================================================== */
 
-function updatePaymentTotal() {
+async function updatePaymentTotal() {
 
-    const total =
-        calculateCartTotal();
+    const cart =
+        getCart();
 
 
-    // NORMAL PAYMENT PAGE TOTAL
-
-    const paymentTotal =
-        document.getElementById(
-            "paymentTotal"
-        );
-
-    if (paymentTotal) {
-
-        paymentTotal.textContent =
-            total;
+    if (cart.length === 0) {
+        return;
     }
 
 
-    // UPI PAYMENT TOTAL
+    try {
 
-    const upiPaymentAmount =
-        document.getElementById(
-            "upiPaymentAmount"
+        /*
+           Use latest Firestore prices so the
+           payment preview matches the final order.
+        */
+
+        const orderData =
+            await buildFreshOrderData(
+                cart
+            );
+
+
+        const bookCountElement =
+            document.getElementById(
+                "paymentBookCount"
+            );
+
+        const subtotalElement =
+            document.getElementById(
+                "paymentSubtotal"
+            );
+
+        const discountPercentElement =
+            document.getElementById(
+                "paymentDiscountPercent"
+            );
+
+        const discountAmountElement =
+            document.getElementById(
+                "paymentDiscountAmount"
+            );
+
+        const paymentTotal =
+            document.getElementById(
+                "paymentTotal"
+            );
+
+        const upiPaymentAmount =
+            document.getElementById(
+                "upiPaymentAmount"
+            );
+
+
+        if (bookCountElement) {
+
+            bookCountElement.textContent =
+                orderData.totalBooks;
+        }
+
+
+        if (subtotalElement) {
+
+            subtotalElement.textContent =
+                Number(
+                    orderData.subtotal
+                ).toFixed(2);
+        }
+
+
+        if (discountPercentElement) {
+
+            discountPercentElement.textContent =
+                orderData.discountPercent;
+        }
+
+
+        if (discountAmountElement) {
+
+            discountAmountElement.textContent =
+                Number(
+                    orderData.discountAmount
+                ).toFixed(2);
+        }
+
+
+        if (paymentTotal) {
+
+            paymentTotal.textContent =
+                Number(
+                    orderData.total
+                ).toFixed(2);
+        }
+
+
+        /*
+           UPI must show the FINAL amount
+           after discount.
+        */
+
+        if (upiPaymentAmount) {
+
+            upiPaymentAmount.textContent =
+                Number(
+                    orderData.total
+                ).toFixed(2);
+        }
+
+    }
+    catch (error) {
+
+        console.error(
+            "Payment total calculation error:",
+            error
         );
 
-    if (upiPaymentAmount) {
-
-        upiPaymentAmount.textContent =
-            total;
+        alert(
+            "Could not calculate the latest order total.\n\n" +
+            error.message
+        );
     }
 }
 
@@ -6768,6 +6858,40 @@ function generateReceipt(order) {
     const address =
         order.address || {};
 
+   const subtotal =
+    Number(
+        order.subtotal ??
+        order.total ??
+        0
+    );
+
+
+const totalBooks =
+    Number(
+        order.totalBooks ??
+        getTotalBookQuantity(
+            order.books || []
+        )
+    );
+
+
+const discountPercent =
+    Number(
+        order.discountPercent || 0
+    );
+
+
+const discountAmount =
+    Number(
+        order.discountAmount || 0
+    );
+
+
+const finalTotal =
+    Number(
+        order.total || 0
+    );
+
 
     container.innerHTML = `
 
@@ -6830,15 +6954,54 @@ function generateReceipt(order) {
 
         </p>
 
-        <hr>
+     <hr>
 
-        ${booksHTML}
+${booksHTML}
 
-        <hr>
+<hr>
 
-        <h2>
-            Total: ₹${order.total}
-        </h2>
+<div class="receipt-summary">
+
+    <p>
+        <strong>Total Books:</strong>
+        ${totalBooks}
+    </p>
+
+    <p>
+        <strong>Subtotal:</strong>
+        ₹${subtotal.toFixed(2)}
+    </p>
+
+    ${
+        discountPercent > 0
+            ? `
+                <p>
+                    <strong>
+                        Discount (${discountPercent}%):
+                    </strong>
+
+                    - ₹${discountAmount.toFixed(2)}
+                </p>
+
+                <p>
+                    <strong>You Saved:</strong>
+                    ₹${discountAmount.toFixed(2)}
+                </p>
+            `
+            : `
+                <p>
+                    <strong>Discount:</strong>
+                    No discount
+                </p>
+            `
+    }
+
+    <h2>
+        Final Total:
+        ₹${finalTotal.toFixed(2)}
+    </h2>
+
+</div>
     `;
 }
 
@@ -7055,6 +7218,43 @@ catch (error) {
                     }
                 );
 
+               /* =========================================
+   PURCHASE DISCOUNT DETAILS
+========================================= */
+
+const totalBooks =
+    Number(
+        order.totalBooks ??
+        getTotalBookQuantity(
+            order.books || []
+        )
+    );
+
+
+const subtotal =
+    Number(
+        order.subtotal ??
+        order.total ??
+        0
+    );
+
+
+const discountPercent =
+    Number(
+        order.discountPercent || 0
+    );
+
+
+const discountAmount =
+    Number(
+        order.discountAmount || 0
+    );
+
+
+const finalTotal =
+    Number(
+        order.total || 0
+    );
 
                 const card =
                     document.createElement(
@@ -7169,13 +7369,51 @@ ${
 }
 
 
-<p>
-    <strong>
-        Total:
-    </strong>
+<div class="history-price-summary">
 
-    ₹${order.total}
-</p>
+    <p>
+        <strong>Total Books:</strong>
+        ${totalBooks}
+    </p>
+
+    <p>
+        <strong>Subtotal:</strong>
+        ₹${subtotal.toFixed(2)}
+    </p>
+
+    ${
+        discountPercent > 0
+            ? `
+                <p>
+                    <strong>
+                        Discount:
+                    </strong>
+
+                    ${discountPercent}%
+                </p>
+
+                <p>
+                    <strong>
+                        You Saved:
+                    </strong>
+
+                    ₹${discountAmount.toFixed(2)}
+                </p>
+            `
+            : `
+                <p>
+                    <strong>Discount:</strong>
+                    No discount
+                </p>
+            `
+    }
+
+    <p>
+        <strong>Final Total:</strong>
+        ₹${finalTotal.toFixed(2)}
+    </p>
+
+</div>
 
 
 <p>
