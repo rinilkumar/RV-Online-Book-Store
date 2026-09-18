@@ -6183,11 +6183,11 @@ function changePaymentMethod() {
             "none";
     }
 
-    if (continueButton) {
+  if (continueButton) {
 
-        continueButton.style.display =
-            "block";
-    }
+    continueButton.style.display =
+        "inline-flex";
+}
 
 
     // CLEAR OLD TRANSACTION ID
