@@ -8717,6 +8717,44 @@ try {
         .forEach(
             function (order) {
 
+               /* =========================================
+   PAYMENT DISCOUNT DETAILS
+========================================= */
+
+const subtotal =
+    Number(
+        order.subtotal ??
+        order.total ??
+        0
+    );
+
+
+const totalBooks =
+    Number(
+        order.totalBooks ??
+        getTotalBookQuantity(
+            order.books || []
+        )
+    );
+
+
+const discountPercent =
+    Number(
+        order.discountPercent || 0
+    );
+
+
+const discountAmount =
+    Number(
+        order.discountAmount || 0
+    );
+
+
+const finalTotal =
+    Number(
+        order.total || 0
+    );
+               
                 const card =
                     document.createElement(
                         "div"
@@ -8761,13 +8799,76 @@ try {
                     </p>
 
 
-                    <p>
-                        <strong>
-                            Amount:
-                        </strong>
+                  <div class="order-discount-details">
 
-                        ₹${order.total}
-                    </p>
+    <h4>
+        💰 Payment Amount Details
+    </h4>
+
+
+    <p>
+        <strong>
+            Total Books:
+        </strong>
+
+        ${totalBooks}
+    </p>
+
+
+    <p>
+        <strong>
+            Subtotal:
+        </strong>
+
+        ₹${subtotal.toFixed(2)}
+    </p>
+
+
+    ${
+        discountPercent > 0
+            ? `
+
+                <p>
+                    <strong>
+                        Discount:
+                    </strong>
+
+                    ${discountPercent}%
+                </p>
+
+
+                <p>
+                    <strong>
+                        Customer Saved:
+                    </strong>
+
+                    ₹${discountAmount.toFixed(2)}
+                </p>
+
+            `
+            : `
+
+                <p>
+                    <strong>
+                        Discount:
+                    </strong>
+
+                    No discount
+                </p>
+
+            `
+    }
+
+
+    <p>
+        <strong>
+            Final Payment:
+        </strong>
+
+        ₹${finalTotal.toFixed(2)}
+    </p>
+
+</div>
 
 
                     <p>
@@ -10421,6 +10522,35 @@ async function displayManagerCustomerActivity(
                 );
         }
 
+       /* =========================================
+   MANAGER DISCOUNT DETAILS
+========================================= */
+
+const subtotal =
+    Number(
+        order.subtotal ??
+        order.total ??
+        0
+    );
+
+
+const discountPercent =
+    Number(
+        order.discountPercent || 0
+    );
+
+
+const discountAmount =
+    Number(
+        order.discountAmount || 0
+    );
+
+
+const finalTotal =
+    Number(
+        order.total || 0
+    );
+
 
         /* =====================================
            CREATE ACTIVITY CARD
@@ -10459,10 +10589,62 @@ async function displayManagerCustomerActivity(
             </p>
 
 
-            <p>
-                <strong>Total:</strong>
-                ₹${order.total || 0}
-            </p>
+           <div class="order-discount-details">
+
+    <p>
+        <strong>
+            Subtotal:
+        </strong>
+
+        ₹${subtotal.toFixed(2)}
+    </p>
+
+
+    ${
+        discountPercent > 0
+            ? `
+
+                <p>
+                    <strong>
+                        Discount:
+                    </strong>
+
+                    ${discountPercent}%
+                </p>
+
+
+                <p>
+                    <strong>
+                        Discount Amount:
+                    </strong>
+
+                    - ₹${discountAmount.toFixed(2)}
+                </p>
+
+            `
+            : `
+
+                <p>
+                    <strong>
+                        Discount:
+                    </strong>
+
+                    No discount
+                </p>
+
+            `
+    }
+
+
+    <p>
+        <strong>
+            Final Total:
+        </strong>
+
+        ₹${finalTotal.toFixed(2)}
+    </p>
+
+</div>
 
 
             <p>
@@ -13734,7 +13916,47 @@ try {
                             `;
                         }
                     );
+
+                   
                 }
+
+               /* =========================================
+   ADMIN DISCOUNT DETAILS
+========================================= */
+
+const totalBooks =
+    Number(
+        order.totalBooks ??
+        getTotalBookQuantity(
+            order.books || []
+        )
+    );
+
+
+const subtotal =
+    Number(
+        order.subtotal ??
+        order.total ??
+        0
+    );
+
+
+const discountPercent =
+    Number(
+        order.discountPercent || 0
+    );
+
+
+const discountAmount =
+    Number(
+        order.discountAmount || 0
+    );
+
+
+const finalTotal =
+    Number(
+        order.total || 0
+    );
 
 
                 const card =
@@ -13966,13 +14188,76 @@ ${
 }
 
 
-<p>
-    <strong>
-        Total:
-    </strong>
+<div class="order-discount-details">
 
-    ₹${order.total}
-</p>
+    <h4>
+        💰 Price & Discount Details
+    </h4>
+
+
+    <p>
+        <strong>
+            Total Books:
+        </strong>
+
+        ${totalBooks}
+    </p>
+
+
+    <p>
+        <strong>
+            Subtotal:
+        </strong>
+
+        ₹${subtotal.toFixed(2)}
+    </p>
+
+
+    ${
+        discountPercent > 0
+            ? `
+
+                <p>
+                    <strong>
+                        Discount:
+                    </strong>
+
+                    ${discountPercent}%
+                </p>
+
+
+                <p>
+                    <strong>
+                        Discount Amount:
+                    </strong>
+
+                    - ₹${discountAmount.toFixed(2)}
+                </p>
+
+            `
+            : `
+
+                <p>
+                    <strong>
+                        Discount:
+                    </strong>
+
+                    No discount
+                </p>
+
+            `
+    }
+
+
+    <p>
+        <strong>
+            Final Total:
+        </strong>
+
+        ₹${finalTotal.toFixed(2)}
+    </p>
+
+</div>
                     <p>
                         <strong>
                             Status:
