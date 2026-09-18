@@ -7224,13 +7224,34 @@ const finalTotal =
 
     container.innerHTML = `
 
-        <h1>
-            📚 Book Haven
-        </h1>
+    <div class="receipt-success-header">
+
+        <div class="receipt-success-icon">
+            ✓
+        </div>
 
         <h2>
-            Purchase Receipt
+            Order Placed Successfully!
         </h2>
+
+        <p>
+            Thank you for shopping with RV Book Store.
+        </p>
+
+    </div>
+
+
+    <div class="receipt-store-title">
+
+        <h1>
+            📚 RV Book Store
+        </h1>
+
+        <p>
+            Purchase Receipt
+        </p>
+
+    </div>
 
         <p>
             <strong>Order No:</strong>
