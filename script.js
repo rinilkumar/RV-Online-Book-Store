@@ -12031,6 +12031,32 @@ catch (error) {
 
 </div>
 
+<div class="manager-payment-permission">
+
+    <p>
+        <strong>
+            Add Books Permission:
+        </strong>
+
+        ${
+            manager.canAddBooks === true
+                ? `
+                    <span class="payment-permission-allowed">
+                        ✅ Allowed
+                    </span>
+                `
+                : `
+                    <span class="payment-permission-denied">
+                        ❌ Not Allowed
+                    </span>
+                `
+        }
+
+    </p>
+
+</div>
+
+
 
             <div class="manager-actions">
 
@@ -12071,6 +12097,34 @@ catch (error) {
                             onclick="allowManagerPaymentPermission('${manager.managerId}')"
                         >
                             ✓ Allow Payment Verification
+                        </button>
+                    `
+            }
+
+        `
+        : ""
+}
+
+${
+    manager.status === "Approved"
+        ? `
+
+            ${
+                manager.canAddBooks === true
+                    ? `
+                        <button
+                            class="manager-payment-remove-btn"
+                            onclick="removeManagerAddBookPermission('${manager.managerId}')"
+                        >
+                            ✕ Remove Add Books Permission
+                        </button>
+                    `
+                    : `
+                        <button
+                            class="manager-payment-allow-btn"
+                            onclick="allowManagerAddBookPermission('${manager.managerId}')"
+                        >
+                            ✓ Allow Add Books
                         </button>
                     `
             }
@@ -12299,6 +12353,7 @@ async function allowManagerPaymentPermission(
     }
 }
 
+
 /* =====================================================
    REMOVE MANAGER PAYMENT VERIFICATION - FIRESTORE
 ===================================================== */
@@ -12438,6 +12493,253 @@ async function removeManagerPaymentPermission(
 
         alert(
             "Could not remove payment permission.\n\n" +
+            error.message
+        );
+    }
+}
+
+/* =====================================================
+   ALLOW MANAGER TO ADD BOOKS
+===================================================== */
+
+async function allowManagerAddBookPermission(
+    managerId
+) {
+
+    if (!isAdminLoggedIn()) {
+
+        alert(
+            "Admin permission required."
+        );
+
+        return;
+    }
+
+
+    try {
+
+        const snapshot =
+            await db.collection("managers")
+                .where(
+                    "managerId",
+                    "==",
+                    managerId
+                )
+                .limit(1)
+                .get();
+
+
+        if (snapshot.empty) {
+
+            alert(
+                "Manager not found."
+            );
+
+            return;
+        }
+
+
+        const managerDoc =
+            snapshot.docs[0];
+
+        const manager =
+            managerDoc.data();
+
+
+        if (
+            manager.status !==
+            "Approved"
+        ) {
+
+            alert(
+                "Only approved Managers can receive Add Books permission."
+            );
+
+            return;
+        }
+
+
+        if (
+            manager.canAddBooks ===
+            true
+        ) {
+
+            alert(
+                "This Manager already has Add Books permission."
+            );
+
+            return;
+        }
+
+
+        const confirmed =
+            confirm(
+                "Allow this Manager to add books?\n\n" +
+                "Manager: " +
+                manager.name +
+                "\nManager ID: " +
+                manager.managerId
+            );
+
+
+        if (!confirmed) {
+            return;
+        }
+
+
+        await db.collection("managers")
+            .doc(managerDoc.id)
+            .update({
+
+                canAddBooks:
+                    true
+
+            });
+
+
+        console.log(
+            "Add Books permission allowed:",
+            manager.managerId
+        );
+
+
+        await displayManagers();
+
+
+        alert(
+            "Add Books permission allowed successfully.\n\n" +
+            "Manager: " +
+            manager.name
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error allowing Add Books permission:",
+            error
+        );
+
+
+        alert(
+            "Could not allow Add Books permission.\n\n" +
+            error.message
+        );
+    }
+}
+
+/* =====================================================
+   REMOVE MANAGER ADD-BOOK PERMISSION
+===================================================== */
+
+async function removeManagerAddBookPermission(
+    managerId
+) {
+
+    if (!isAdminLoggedIn()) {
+
+        alert(
+            "Admin permission required."
+        );
+
+        return;
+    }
+
+
+    try {
+
+        const snapshot =
+            await db.collection("managers")
+                .where(
+                    "managerId",
+                    "==",
+                    managerId
+                )
+                .limit(1)
+                .get();
+
+
+        if (snapshot.empty) {
+
+            alert(
+                "Manager not found."
+            );
+
+            return;
+        }
+
+
+        const managerDoc =
+            snapshot.docs[0];
+
+        const manager =
+            managerDoc.data();
+
+
+        if (
+            manager.canAddBooks !==
+            true
+        ) {
+
+            alert(
+                "This Manager does not have Add Books permission."
+            );
+
+            return;
+        }
+
+
+        const confirmed =
+            confirm(
+                "Remove Add Books permission?\n\n" +
+                "Manager: " +
+                manager.name +
+                "\nManager ID: " +
+                manager.managerId
+            );
+
+
+        if (!confirmed) {
+            return;
+        }
+
+
+        await db.collection("managers")
+            .doc(managerDoc.id)
+            .update({
+
+                canAddBooks:
+                    false
+
+            });
+
+
+        console.log(
+            "Add Books permission removed:",
+            manager.managerId
+        );
+
+
+        await displayManagers();
+
+
+        alert(
+            "Add Books permission removed successfully.\n\n" +
+            "Manager: " +
+            manager.name
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Error removing Add Books permission:",
+            error
+        );
+
+
+        alert(
+            "Could not remove Add Books permission.\n\n" +
             error.message
         );
     }
