@@ -1174,6 +1174,22 @@ async function managerLogout() {
 
 function showPage(pageId) {
 
+   /* =========================================
+   BLOCK STAFF FROM CUSTOMER CART
+========================================= */
+
+if (
+    pageId === "cart" &&
+    (
+        isAdminLoggedIn() ||
+        isManagerLoggedIn()
+    )
+) {
+
+    showPage("home");
+    return;
+}
+
     const page =
         document.getElementById(pageId);
 
@@ -1954,6 +1970,11 @@ function updateNavigation() {
             "historyNav"
         );
 
+   const cartButton =
+    document.getElementById(
+        "cartNav"
+    );
+
 
     /* =========================================
        ADMIN LOGGED IN
@@ -1980,6 +2001,12 @@ function updateNavigation() {
             historyButton.style.display =
                 "none";
         }
+
+       if (cartButton) {
+
+    cartButton.style.display =
+        "none";
+}
 
         return;
     }
@@ -2013,6 +2040,12 @@ function updateNavigation() {
                 "none";
         }
 
+       if (cartButton) {
+
+    cartButton.style.display =
+        "none";
+}
+
         return;
     }
 
@@ -2042,6 +2075,12 @@ function updateNavigation() {
             historyButton.style.display =
                 "inline-block";
         }
+
+       if (cartButton) {
+
+    cartButton.style.display =
+        "inline-block";
+}
 
         return;
     }
@@ -2076,6 +2115,13 @@ function updateNavigation() {
         historyButton.style.display =
             "none";
     }
+
+   if (cartButton) {
+
+    cartButton.style.display =
+        "inline-block";
+}
+   
 }
 
 /* =====================================================
