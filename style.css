@@ -3713,3 +3713,154 @@ footer {
     font-size: 16px;
     font-weight: bold;
 }
+
+/* =====================================================
+   STABLE CONTINUE PAYMENT BUTTON
+===================================================== */
+
+#continuePaymentBtn {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 170px;
+    min-height: 42px;
+
+    padding: 11px 18px;
+
+    box-sizing: border-box;
+
+    margin-left: auto;
+    margin-right: auto;
+
+    text-align: center;
+
+    white-space: nowrap;
+}
+
+/* =====================================================
+   RECEIPT OPEN EFFECT
+===================================================== */
+
+#receipt.active .receipt-container {
+    animation:
+        receiptOpenEffect 0.55s ease-out;
+}
+
+
+@keyframes receiptOpenEffect {
+
+    0% {
+        opacity: 0;
+        transform:
+            translateY(25px)
+            scale(0.97);
+    }
+
+    100% {
+        opacity: 1;
+        transform:
+            translateY(0)
+            scale(1);
+    }
+}
+
+
+/* =====================================================
+   RECEIPT SUCCESS HEADER
+===================================================== */
+
+.receipt-success-header {
+    text-align: center;
+
+    padding: 10px 15px 22px;
+
+    margin-bottom: 22px;
+
+    border-bottom:
+        1px solid #e8e8e8;
+}
+
+
+.receipt-success-icon {
+    width: 58px;
+    height: 58px;
+
+    margin:
+        0 auto
+        12px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: #28a745;
+    color: white;
+
+    font-size: 32px;
+    font-weight: bold;
+
+    animation:
+        receiptSuccessPop 0.55s ease-out;
+}
+
+
+@keyframes receiptSuccessPop {
+
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    65% {
+        transform: scale(1.15);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+
+.receipt-success-header h2 {
+    margin-bottom: 6px;
+
+    color: #28a745;
+
+    font-size: 22px;
+}
+
+
+.receipt-success-header p {
+    margin: 0;
+
+    color: #666;
+}
+
+
+.receipt-store-title {
+    text-align: center;
+
+    margin-bottom: 22px;
+}
+
+
+.receipt-store-title h1 {
+    margin-bottom: 5px;
+
+    color: #222;
+}
+
+
+.receipt-store-title p {
+    margin: 0;
+
+    color: #777;
+
+    font-weight: bold;
+}
