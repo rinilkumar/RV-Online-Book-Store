@@ -8717,17 +8717,9 @@ try {
         .forEach(
             function (order) {
 
-               /* =========================================
-   PAYMENT DISCOUNT DETAILS
+/* =========================================
+   MANAGER PAYMENT DISCOUNT DETAILS
 ========================================= */
-
-const subtotal =
-    Number(
-        order.subtotal ??
-        order.total ??
-        0
-    );
-
 
 const totalBooks =
     Number(
@@ -8735,6 +8727,14 @@ const totalBooks =
         getTotalBookQuantity(
             order.books || []
         )
+    );
+
+
+const subtotal =
+    Number(
+        order.subtotal ??
+        order.total ??
+        0
     );
 
 
@@ -8754,11 +8754,13 @@ const finalTotal =
     Number(
         order.total || 0
     );
+
                
                 const card =
                     document.createElement(
                         "div"
                     );
+               
 
 
                 card.className =
