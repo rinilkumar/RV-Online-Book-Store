@@ -6909,13 +6909,6 @@ catch (error) {
 
     generateReceipt(order);
 
-
-    alert(
-        "Payment details submitted successfully!\n\n" +
-        "Your payment is waiting for admin verification."
-    );
-
-
     showPage("receipt");
 }
 
@@ -7113,12 +7106,6 @@ catch (error) {
     displayCart();
    
     generateReceipt(order);
-
-
-   alert(
-    "Order placed successfully!\n\n" +
-    "Your Cash on Delivery order is waiting for Admin confirmation."
-);
 
 
     showPage("receipt");
