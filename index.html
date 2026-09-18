@@ -1697,6 +1697,122 @@
 
 </div>
 
+        <!-- =====================================================
+     MANAGER ADD BOOK
+===================================================== -->
+
+<div
+    id="managerAddBookSection"
+    class="manager-dashboard-card"
+    style="display: none;"
+>
+
+    <h2>
+        📚 Add New Book
+    </h2>
+
+    <p>
+        Add a new book to the store.
+        This section is available only when
+        Admin grants Add Books permission.
+    </p>
+
+
+    <form
+        class="admin-form"
+        onsubmit="managerAddBook(event)"
+    >
+
+        <input
+            type="text"
+            id="managerBookTitle"
+            placeholder="Book Title"
+            required
+        >
+
+
+        <input
+            type="text"
+            id="managerBookAuthor"
+            placeholder="Author Name"
+            required
+        >
+
+
+        <input
+            type="number"
+            id="managerBookPrice"
+            placeholder="Price ₹"
+            min="1"
+            required
+        >
+
+
+        <select
+            id="managerBookCategory"
+            onchange="loadManagerBookSubcategories()"
+            required
+        >
+
+            <option
+                value=""
+                disabled
+                selected
+            >
+                Select Category
+            </option>
+
+        </select>
+
+
+        <div class="book-subcategory-box">
+
+            <label class="subcategory-label">
+                Select Subcategories
+            </label>
+
+            <div
+                id="managerBookSubcategoryList"
+                class="book-subcategory-list"
+            >
+
+                <p class="subcategory-help">
+                    Select a category first.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <input
+            type="number"
+            id="managerBookStock"
+            placeholder="Stock"
+            min="0"
+            required
+        >
+
+
+        <input
+            type="text"
+            id="managerBookImage"
+            placeholder="Book Image URL"
+            required
+        >
+
+
+        <button
+            type="submit"
+            class="btn"
+        >
+            + Add Book
+        </button>
+
+    </form>
+
+</div>
+
 
         <!-- STOCK MANAGEMENT -->
 
