@@ -4330,6 +4330,14 @@ const subcategoryMatch =
     filtered.forEach(
         function (book) {
 
+           /* =========================================
+   CUSTOMER SHOPPING ACCESS
+========================================= */
+
+const shoppingAllowed =
+    !isAdminLoggedIn() &&
+    !isManagerLoggedIn();
+
             const stock =
                 Number(book.stock) || 0;
 
@@ -4373,54 +4381,66 @@ const subcategoryMatch =
                         Stock: ${stock}
                     </p>
 
-                    ${
-                        stock > 0
-                        ? `
+               ${
+    shoppingAllowed
 
-                        <div class="quantity-selector">
+        ? (
 
-                            <button
-                                onclick="changeBookQuantity(${book.id}, -1)"
-                            >
-                                −
-                            </button>
+            stock > 0
 
-                            <input
-                                id="bookQty-${book.id}"
-                                type="number"
-                                value="1"
-                                min="1"
-                                max="${stock}"
-                                readonly
-                            >
+                ? `
 
-                            <button
-                                onclick="changeBookQuantity(${book.id}, 1)"
-                            >
-                                +
-                            </button>
-
-                        </div>
+                    <div class="quantity-selector">
 
                         <button
-                            class="add-cart"
-                            onclick="addSelectedBookToCart(${book.id})"
+                            onclick="changeBookQuantity(${book.id}, -1)"
                         >
-                            🛒 Add to Cart
+                            −
                         </button>
 
-                        `
-                        : `
+
+                        <input
+                            id="bookQty-${book.id}"
+                            type="number"
+                            value="1"
+                            min="1"
+                            max="${stock}"
+                            readonly
+                        >
+
 
                         <button
-                            class="add-cart"
-                            disabled
+                            onclick="changeBookQuantity(${book.id}, 1)"
                         >
-                            Out of Stock
+                            +
                         </button>
 
-                        `
-                    }
+                    </div>
+
+
+                    <button
+                        class="add-cart"
+                        onclick="addSelectedBookToCart(${book.id})"
+                    >
+                        🛒 Add to Cart
+                    </button>
+
+                `
+
+                : `
+
+                    <button
+                        class="add-cart"
+                        disabled
+                    >
+                        Out of Stock
+                    </button>
+
+                `
+        )
+
+        : ""
+}
 
                 </div>
             `;
@@ -4442,6 +4462,18 @@ function changeBookQuantity(
     bookId,
     amount
 ) {
+
+   /* =========================================
+   ADMIN / MANAGER CANNOT SHOP
+========================================= */
+
+if (
+    isAdminLoggedIn() ||
+    isManagerLoggedIn()
+) {
+
+    return;
+}
 
     const input =
         document.getElementById(
@@ -4482,6 +4514,20 @@ function changeBookQuantity(
 ===================================================== */
 
 async function addSelectedBookToCart(bookId) {
+
+
+    /* =========================================
+       ADMIN / MANAGER CANNOT USE CART
+    ========================================= */
+
+    if (
+        isAdminLoggedIn() ||
+        isManagerLoggedIn()
+    ) {
+
+        return;
+    }
+
 
     try {
 
