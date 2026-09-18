@@ -3617,6 +3617,153 @@ function loadManagerBookCategories() {
 
 
 /* =====================================================
+   LOAD SUBCATEGORIES FOR MANAGER ADD BOOK
+===================================================== */
+
+function loadManagerBookSubcategories() {
+
+    const categorySelect =
+        document.getElementById(
+            "managerBookCategory"
+        );
+
+
+    const container =
+        document.getElementById(
+            "managerBookSubcategoryList"
+        );
+
+
+    if (
+        !categorySelect ||
+        !container
+    ) {
+
+        return;
+    }
+
+
+    const category =
+        categorySelect.value;
+
+
+    container.innerHTML = "";
+
+
+    if (!category) {
+
+        container.innerHTML = `
+            <p class="subcategory-help">
+                Select a category first.
+            </p>
+        `;
+
+        return;
+    }
+
+
+    const allSubcategories =
+        getSubcategories();
+
+
+    const subcategories =
+        (
+            allSubcategories[category] ||
+            []
+        )
+            .slice()
+            .sort(
+                function (a, b) {
+
+                    return a.localeCompare(
+                        b,
+                        undefined,
+                        {
+                            sensitivity:
+                                "base"
+                        }
+                    );
+
+                }
+            );
+
+
+    if (
+        subcategories.length === 0
+    ) {
+
+        container.innerHTML = `
+            <p class="subcategory-help">
+                No subcategories available
+                for this category.
+            </p>
+        `;
+
+        return;
+    }
+
+
+    subcategories.forEach(
+        function (subcategory) {
+
+            const label =
+                document.createElement(
+                    "label"
+                );
+
+
+            label.className =
+                "book-subcategory-option";
+
+
+            const checkbox =
+                document.createElement(
+                    "input"
+                );
+
+
+            checkbox.type =
+                "checkbox";
+
+
+            checkbox.name =
+                "managerBookSubcategories";
+
+
+            checkbox.value =
+                subcategory;
+
+
+            const text =
+                document.createElement(
+                    "span"
+                );
+
+
+            text.textContent =
+                subcategory;
+
+
+            label.appendChild(
+                checkbox
+            );
+
+
+            label.appendChild(
+                text
+            );
+
+
+            container.appendChild(
+                label
+            );
+
+        }
+    );
+}
+
+
+/* =====================================================
    LOAD SUBCATEGORIES FOR ADD BOOK
    MULTIPLE SUBCATEGORY VERSION
 ===================================================== */
@@ -8610,6 +8757,48 @@ setText(
             }
         }
 
+       /* =========================================
+   ADD BOOK PERMISSION
+========================================= */
+
+const managerAddBookSection =
+    document.getElementById(
+        "managerAddBookSection"
+    );
+
+
+if (
+    managerCanAddBooks()
+) {
+
+    if (
+        managerAddBookSection
+    ) {
+
+        managerAddBookSection
+            .style
+            .display =
+            "block";
+    }
+
+
+    loadManagerBookCategories();
+
+}
+else {
+
+    if (
+        managerAddBookSection
+    ) {
+
+        managerAddBookSection
+            .style
+            .display =
+            "none";
+    }
+
+}
+
     }
     catch (error) {
 
@@ -8624,6 +8813,7 @@ setText(
         );
     }
 }
+
 
 /* =====================================================
    OPEN MANAGER PAYMENT VERIFICATION
@@ -11002,6 +11192,350 @@ db.collection("books")
 
 
 }
+
+/* =====================================================
+   ADD BOOK - MANAGER
+===================================================== */
+
+async function managerAddBook(event) {
+
+    event.preventDefault();
+
+
+    /* =========================================
+       CHECK MANAGER LOGIN
+    ========================================= */
+
+    if (!isManagerLoggedIn()) {
+
+        alert(
+            "Manager login required."
+        );
+
+        return;
+    }
+
+
+    const user =
+        auth.currentUser;
+
+
+    if (!user) {
+
+        alert(
+            "Manager Firebase session not found."
+        );
+
+        return;
+    }
+
+
+    try {
+
+        /* =========================================
+           GET FRESH MANAGER PERMISSION
+        ========================================= */
+
+        const managerDoc =
+            await db.collection(
+                "managers"
+            )
+                .doc(user.uid)
+                .get();
+
+
+        if (!managerDoc.exists) {
+
+            alert(
+                "Manager profile not found."
+            );
+
+            return;
+        }
+
+
+        const manager =
+            managerDoc.data();
+
+
+        if (
+            manager.status !==
+                "Approved" ||
+
+            manager.canAddBooks !==
+                true
+        ) {
+
+            alert(
+                "You do not have permission to add books."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           GET SELECTED SUBCATEGORIES
+        ========================================= */
+
+        const selectedSubcategories =
+            Array.from(
+                document.querySelectorAll(
+                    'input[name="managerBookSubcategories"]:checked'
+                )
+            )
+                .map(
+                    function (checkbox) {
+
+                        return checkbox.value;
+
+                    }
+                );
+
+
+        if (
+            selectedSubcategories.length ===
+            0
+        ) {
+
+            alert(
+                "Please select at least one subcategory."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           GET FORM VALUES
+        ========================================= */
+
+        const title =
+            document
+                .getElementById(
+                    "managerBookTitle"
+                )
+                .value
+                .trim();
+
+
+        const author =
+            document
+                .getElementById(
+                    "managerBookAuthor"
+                )
+                .value
+                .trim();
+
+
+        const price =
+            Number(
+                document
+                    .getElementById(
+                        "managerBookPrice"
+                    )
+                    .value
+            );
+
+
+        const category =
+            document
+                .getElementById(
+                    "managerBookCategory"
+                )
+                .value;
+
+
+        const stock =
+            Number(
+                document
+                    .getElementById(
+                        "managerBookStock"
+                    )
+                    .value
+            );
+
+
+        const image =
+            document
+                .getElementById(
+                    "managerBookImage"
+                )
+                .value
+                .trim();
+
+
+        /* =========================================
+           VALIDATE VALUES
+        ========================================= */
+
+        if (
+            !title ||
+            !author ||
+            !category ||
+            !image
+        ) {
+
+            alert(
+                "Please fill all book details."
+            );
+
+            return;
+        }
+
+
+        if (
+            !Number.isFinite(price) ||
+            price <= 0
+        ) {
+
+            alert(
+                "Please enter a valid book price."
+            );
+
+            return;
+        }
+
+
+        if (
+            !Number.isInteger(stock) ||
+            stock < 0
+        ) {
+
+            alert(
+                "Please enter a valid stock quantity."
+            );
+
+            return;
+        }
+
+
+        /* =========================================
+           CREATE BOOK
+        ========================================= */
+
+        const book = {
+
+            id:
+                Date.now(),
+
+            title:
+                title,
+
+            author:
+                author,
+
+            price:
+                price,
+
+            category:
+                category,
+
+            subcategories:
+                selectedSubcategories,
+
+            stock:
+                stock,
+
+            image:
+                image
+
+        };
+
+
+        /* =========================================
+           SAVE BOOK TO FIRESTORE
+        ========================================= */
+
+        await db.collection(
+            "books"
+        )
+            .doc(
+                String(book.id)
+            )
+            .set(book);
+
+
+        console.log(
+            "Manager added book:",
+            book
+        );
+
+
+        /* =========================================
+           RESET FORM
+        ========================================= */
+
+        event.target.reset();
+
+
+        const subcategoryContainer =
+            document.getElementById(
+                "managerBookSubcategoryList"
+            );
+
+
+        if (
+            subcategoryContainer
+        ) {
+
+            subcategoryContainer
+                .innerHTML = `
+
+                <p class="subcategory-help">
+                    Select a category first.
+                </p>
+
+            `;
+        }
+
+
+        loadManagerBookCategories();
+
+
+        /* =========================================
+           REFRESH WEBSITE
+        ========================================= */
+
+        await displayBooks();
+
+        await loadManagerDashboard();
+
+
+        alert(
+            "Book added successfully."
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Manager add book error:",
+            error
+        );
+
+
+        if (
+            error.code ===
+            "permission-denied"
+        ) {
+
+            alert(
+                "You do not have permission to add books."
+            );
+
+        }
+        else {
+
+            alert(
+                "Book could not be added.\n\n" +
+                error.message
+            );
+
+        }
+    }
+}
+
 
 /* =====================================================
    DISPLAY ADMIN BOOKS
