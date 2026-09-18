@@ -3679,3 +3679,37 @@ footer {
         width: 100%;
     }
 }
+
+
+/* =====================================================
+   ADMIN / MANAGER DISCOUNT DETAILS
+===================================================== */
+
+.order-discount-details {
+    margin: 15px 0;
+    padding: 14px 16px;
+
+    background: #f8f9fa;
+
+    border-left: 4px solid #ff9800;
+    border-radius: 8px;
+}
+
+
+.order-discount-details h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+
+.order-discount-details p {
+    margin: 6px 0;
+}
+
+
+.order-discount-details p:last-child {
+    margin-top: 10px;
+
+    font-size: 16px;
+    font-weight: bold;
+}
