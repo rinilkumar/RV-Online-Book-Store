@@ -3557,6 +3557,65 @@ function loadAdminCategories() {
     );
 }
 
+
+/* =====================================================
+   LOAD CATEGORIES FOR MANAGER ADD BOOK
+===================================================== */
+
+function loadManagerBookCategories() {
+
+    const select =
+        document.getElementById(
+            "managerBookCategory"
+        );
+
+
+    if (!select) {
+        return;
+    }
+
+
+    const categories =
+        getCategories();
+
+
+    select.innerHTML = `
+        <option
+            value=""
+            disabled
+            selected
+        >
+            Select Category
+        </option>
+    `;
+
+
+    categories.forEach(
+        function (category) {
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                category;
+
+
+            option.textContent =
+                category;
+
+
+            select.appendChild(
+                option
+            );
+
+        }
+    );
+}
+
+
 /* =====================================================
    LOAD SUBCATEGORIES FOR ADD BOOK
    MULTIPLE SUBCATEGORY VERSION
