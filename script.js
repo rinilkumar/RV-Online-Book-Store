@@ -2119,7 +2119,7 @@ function updateNavigation() {
    if (cartButton) {
 
     cartButton.style.display =
-        "inline-block";
+        "none";
 }
    
 }
