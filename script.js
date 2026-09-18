@@ -228,6 +228,34 @@ function managerCanVerifyPayments() {
 }
 
 /* =====================================================
+   CHECK MANAGER ADD-BOOK PERMISSION
+===================================================== */
+
+function managerCanAddBooks() {
+
+    const currentManager =
+        getCurrentManager();
+
+
+    if (
+        !isManagerLoggedIn() ||
+        !currentManager
+    ) {
+
+        return false;
+    }
+
+
+    return (
+        currentManager.status ===
+            "Approved" &&
+
+        currentManager.canAddBooks ===
+            true
+    );
+}
+
+/* =====================================================
    MANAGER FIRESTORE LIVE SYNC
 ===================================================== */
 
@@ -700,16 +728,18 @@ async function registerManager(event) {
                     phone:
                         phone,
 
-                    status:
-                        "Pending",
+                   status:
+    "Pending",
 
-                    canVerifyPayments:
-                        false,
+canVerifyPayments:
+    false,
 
-                    registeredDate:
-                        new Date()
-                            .toLocaleString()
+canAddBooks:
+    false,
 
+registeredDate:
+    new Date()
+        .toLocaleString()
                 };
 
 
